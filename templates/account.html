@@ -3,7 +3,6 @@
 {% block dashboard_title %}My Account{% endblock %}
 
 {% block top_nav %}
-<a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Dashboard</a>
 {% endblock %}
 
 {% block content %}
@@ -23,26 +22,74 @@
 
             <!-- Profile Info Card -->
             <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white border-bottom border-light py-3">
+                <div
+                    class="card-header bg-white border-bottom border-light py-3 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 text-success"><i class="bi bi-person-lines-fill me-2"></i>Profile Details</h5>
+                    <button class="btn btn-sm btn-outline-success" onclick="toggleEditProfile()">
+                        <i class="bi bi-pencil-fill me-1"></i> Edit Profile
+                    </button>
                 </div>
                 <div class="card-body">
-                    <div class="row mb-3">
-                        <label class="col-sm-3 col-form-label text-muted">Username</label>
-                        <div class="col-sm-9">
-                            <input type="text" readonly class="form-control-plaintext fw-bold"
-                                value="{{ user.username }}">
+                    <form id="profileForm" action="{{ url_for('update_profile') }}" method="POST">
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label text-muted">Username</label>
+                            <div class="col-sm-9">
+                                <input type="text" id="usernameDisplay" readonly class="form-control-plaintext fw-bold"
+                                    value="{{ user.username }}">
+                                <input type="text" id="usernameEdit" name="username" class="form-control d-none"
+                                    value="{{ user.username }}" required>
+                            </div>
                         </div>
-                    </div>
-                    <div class="row">
-                        <label class="col-sm-3 col-form-label text-muted">Email</label>
-                        <div class="col-sm-9">
-                            <input type="text" readonly class="form-control-plaintext"
-                                value="{{ user.email or 'Not set' }}">
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label text-muted">Email</label>
+                            <div class="col-sm-9">
+                                <input type="text" id="emailDisplay" readonly class="form-control-plaintext"
+                                    value="{{ user.email or 'Not set' }}">
+                                <input type="email" id="emailEdit" name="email" class="form-control d-none"
+                                    value="{{ user.email or '' }}" placeholder="your.email@example.com">
+                            </div>
                         </div>
-                    </div>
+                        <div id="saveButtons" class="d-none">
+                            <button type="submit" class="btn btn-success me-2">
+                                <i class="bi bi-check-circle me-1"></i> Save Changes
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="cancelEditProfile()">
+                                <i class="bi bi-x-circle me-1"></i> Cancel
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
+
+            <script>
+                function toggleEditProfile() {
+                    // Hide display fields, show edit fields
+                    document.getElementById('usernameDisplay').classList.add('d-none');
+                    document.getElementById('emailDisplay').classList.add('d-none');
+                    document.getElementById('usernameEdit').classList.remove('d-none');
+                    document.getElementById('emailEdit').classList.remove('d-none');
+                    document.getElementById('saveButtons').classList.remove('d-none');
+
+                    // Hide edit button
+                    event.target.closest('button').classList.add('d-none');
+                }
+
+                function cancelEditProfile() {
+                    // Show display fields, hide edit fields
+                    document.getElementById('usernameDisplay').classList.remove('d-none');
+                    document.getElementById('emailDisplay').classList.remove('d-none');
+                    document.getElementById('usernameEdit').classList.add('d-none');
+                    document.getElementById('emailEdit').classList.add('d-none');
+                    document.getElementById('saveButtons').classList.add('d-none');
+
+                    // Show edit button
+                    document.querySelector('.card-header button').classList.remove('d-none');
+
+                    // Reset values
+                    document.getElementById('usernameEdit').value = document.getElementById('usernameDisplay').value;
+                    document.getElementById('emailEdit').value = document.getElementById('emailDisplay').value === 'Not set' ? '' : document.getElementById('emailDisplay').value;
+                }
+            </script>
 
             <!-- Security Actions -->
             <div class="card border-0 shadow-sm mb-4">

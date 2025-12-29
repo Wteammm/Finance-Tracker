@@ -391,15 +391,27 @@ def index():
         db.session.commit()
         return redirect(url_for('index'))
 
-    # Filtering
-    month = request.args.get('month', type=int)
-    year = request.args.get('year', type=int)
+    # Filtering - Default to current month if no filters specified
+    current_date = datetime.now()
+    month = request.args.get('month', default=current_date.month, type=int)
+    year = request.args.get('year', default=current_date.year, type=int)
+    filter_category = request.args.get('category', type=str)
+    min_amount = request.args.get('min_amount', type=float)
+    max_amount = request.args.get('max_amount', type=float)
     
     query = Transaction.query.filter_by(user_id=session.get('user_id'))
-    if month and year:
-        query = query.filter(extract('month', Transaction.date) == month, extract('year', Transaction.date) == year)
-    elif year:
-        query = query.filter(extract('year', Transaction.date) == year)
+    # Always filter by month and year (now defaults to current month/year)
+    query = query.filter(extract('month', Transaction.date) == month, extract('year', Transaction.date) == year)
+    
+    # Category filter
+    if filter_category:
+        query = query.filter(Transaction.category == filter_category)
+    
+    # Amount range filters
+    if min_amount is not None:
+        query = query.filter(Transaction.amount >= min_amount)
+    if max_amount is not None:
+        query = query.filter(Transaction.amount <= max_amount)
         
     transactions = query.order_by(Transaction.date.desc()).all()
     
@@ -461,7 +473,29 @@ def index():
         is_active=True
     ).order_by(CustomCategory.name).all()
 
-    return render_template('index.html', transactions=transactions, total_balance=total_balance, years=years, current_month=current_month, current_year=current_year, accounts=accounts, income_categories=income_categories, expense_categories=expense_categories, pending_recurring=pending_recurring, current_date=current_date)
+    # Group transactions by date for v2.2.1
+    from itertools import groupby
+    from operator import attrgetter
+    
+    transactions_by_date = {}
+    for date, group in groupby(transactions, key=attrgetter('date')):
+        transactions_by_date[date] = list(group)
+
+    return render_template('index.html', 
+        transactions=transactions, 
+        transactions_by_date=transactions_by_date,
+        total_balance=total_balance, 
+        years=years, 
+        current_month=current_month, 
+        current_year=current_year, 
+        filter_category=filter_category,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        accounts=accounts, 
+        income_categories=income_categories, 
+        expense_categories=expense_categories, 
+        pending_recurring=pending_recurring, 
+        current_date=current_date)
 
 @app.route('/recurring/post/<int:id>', methods=['POST'])
 @login_required
@@ -524,6 +558,29 @@ def delete(id):
     db.session.commit()
     # print(f"DEBUG: Deleted transaction {id}")
     return redirect(url_for('index'))
+
+@app.route('/api/transactions/bulk-delete', methods=['POST'])
+@login_required
+def bulk_delete_transactions():
+    """API endpoint to delete multiple transactions at once"""
+    data = request.get_json()
+    ids = data.get('ids', [])
+    
+    if not ids:
+        return jsonify({'success': False, 'error': 'No transaction IDs provided'}), 400
+    
+    try:
+        # Delete transactions that belong to the current user
+        deleted_count = Transaction.query.filter(
+            Transaction.id.in_(ids),
+            Transaction.user_id == session.get('user_id')
+        ).delete(synchronize_session=False)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'deleted_count': deleted_count}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/mortgage/delete/<int:id>', methods=['POST'])
 @login_required
@@ -3785,6 +3842,41 @@ def reset_password():
         return redirect(url_for('login'))
     
     return render_template('reset_password.html')
+
+
+@app.route('/update_profile', methods=['POST'])
+@login_required
+def update_profile():
+    user = User.query.get(session['user_id'])
+    new_username = request.form.get('username', '').strip()
+    new_email = request.form.get('email', '').strip()
+    
+    # Validate username
+    if not new_username:
+        flash('Username cannot be empty', 'danger')
+        return redirect(url_for('account'))
+    
+    # Check if username is taken by another user
+    if new_username != user.username:
+        existing_user = User.query.filter_by(username=new_username).first()
+        if existing_user:
+            flash('Username is already taken', 'danger')
+            return redirect(url_for('account'))
+    
+    # Update username
+    user.username = new_username
+    
+    # Update email (can be empty)
+    user.email = new_email if new_email else None
+    
+    try:
+        db.session.commit()
+        flash('Profile updated successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating profile: {str(e)}', 'danger')
+    
+    return redirect(url_for('account'))
 
 
 @app.route('/init_db_secret_route_12345')

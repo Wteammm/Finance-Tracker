@@ -4,23 +4,108 @@
 {% block dashboard_title %}Daily Transaction{% endblock %}
 
 {% block top_nav %}
-<a href="{{ url_for('chart') }}" class="{% if request.endpoint == 'chart' %}active{% endif %}">Transaction Overview</a>
+<a href="{{ url_for('chart') }}" class="{% if request.endpoint == 'chart' %}active{% endif %}"
+    style="background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 6px; color: white !important; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">Transaction
+    Overview</a>
 {% endblock %}
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-md-8">
+    <div class="col-12">
         <div class="card text-white bg-success mb-3">
-            <div class="card-header">Total Balance</div>
+            <div class="card-header d-flex justify-content-between align-items-center"
+                style="background-color: #52b788 !important; color: white !important; font-weight: 700; font-size: 1.5rem;">
+                <span>Total Balance</span>
+                <div>
+                    <button class="btn btn-sm" data-bs-toggle="modal" data-bs-target="#importModal"
+                        style="background: linear-gradient(135deg, #c9a66b 0%, #a67c52 100%); color: white; font-weight: 700; border: none; box-shadow: 0 3px 10px rgba(166, 124, 82, 0.3); margin-right: 5px;">
+                        <i class="bi bi-upload"></i> Import
+                    </button>
+                    <a href="{{ url_for('export_transactions') }}" class="btn btn-sm"
+                        style="background: linear-gradient(135deg, #c9a66b 0%, #a67c52 100%); color: white !important; font-weight:700; border: none; box-shadow: 0 3px 10px rgba(166, 124, 82, 0.3);">
+                        <i class="bi bi-file-earmark-excel"></i> Export
+                    </a>
+                    <button class="btn btn-success"
+                        style="width: 40px; height: 40px; border-radius: 50%; font-size: 20px; box-shadow: 0 3px 8px rgba(0,0,0,0.2); display: none; align-items: center; justify-content: center; padding: 0;"
+                        data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+                        <i class="bi bi-plus"></i>
+                    </button>
+                </div>
+            </div>
             <div class="card-body">
-                <h3 class="card-title">RM {{ total_balance|comma }}</h3>
+                <h3 class="card-title mb-3">RM {{ total_balance|comma }}</h3>
+
+                <!-- Filter Transactions integrated within Total Balance card -->
+                <div class="border-top pt-3 px-3 pb-3 mt-3"
+                    style="border-color: rgba(255,255,255,0.3) !important; background-color: #2d6a4f; border-radius: 8px; margin: 0 -1rem;">
+                    <form method="GET" action="{{ url_for('index') }}">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1"
+                                    style="color: rgba(255,255,255,0.9); font-weight: 600;">Month</label>
+                                <select class="form-select form-select-sm" name="month">
+                                    <option value="">All Months</option>
+                                    {% for m in range(1, 13) %}
+                                    <option value="{{ m }}" {% if current_month==m %}selected{% endif %}>{{ m }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1"
+                                    style="color: rgba(255,255,255,0.9); font-weight: 600;">Year</label>
+                                <select class="form-select form-select-sm" name="year">
+                                    <option value="">All Years</option>
+                                    {% for y in years %}
+                                    <option value="{{ y }}" {% if current_year==y %}selected{% endif %}>{{ y }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1"
+                                    style="color: rgba(255,255,255,0.9); font-weight: 600;">Category</label>
+                                <select class="form-select form-select-sm" name="category">
+                                    <option value="">All Categories</option>
+                                    <optgroup label="收入 (Income)">
+                                        {% for cat in income_categories %}
+                                        <option value="{{ cat.name }}" {% if filter_category==cat.name %}selected{%
+                                            endif %}>{{ cat.name }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    <optgroup label="支出 (Expense)">
+                                        {% for cat in expense_categories %}
+                                        <option value="{{ cat.name }}" {% if filter_category==cat.name %}selected{%
+                                            endif %}>{{ cat.name }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-sm w-100"
+                                    style="background-color: #52b788; color: white; border: none; font-weight: 600;">Apply</button>
+                            </div>
+                            <div class="col-md-1">
+                                <a href="{{ url_for('index') }}" class="btn btn-sm w-100"
+                                    style="border: 2px solid #2d6a4f; color: #2d6a4f; background: rgba(255,255,255,0.9); font-weight: 600; margin-left: 8px;">Clear</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card mb-3">
-            <div class="card-header bg-white">Add Transaction</div>
-            <div class="card-body">
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal fade" id="addTransactionModal" tabindex="-1" aria-labelledby="addTransactionModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addTransactionModalLabel">Add Transaction</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
                 <form method="POST" id="transactionForm">
                     <div class="mb-2">
                         <label for="date" class="form-label visually-hidden">Date</label>
@@ -84,51 +169,12 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-4">
-        <div class="card mb-3">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Filter Transactions</h5>
-                <div>
-                    <button class="btn btn-sm" data-bs-toggle="modal" data-bs-target="#importModal"
-                        style="background: linear-gradient(135deg, #c9a66b 0%, #a67c52 100%); color: white; font-weight: 700; border: none; box-shadow: 0 3px 10px rgba(166, 124, 82, 0.3); margin-right: 5px;">
-                        <i class="bi bi-upload"></i> Import
-                    </button>
-                    <a href="{{ url_for('export_transactions') }}" class="btn btn-sm"
-                        style="background: linear-gradient(135deg, #c9a66b 0%, #a67c52 100%); color: white !important; font-weight:700; border: none; box-shadow: 0 3px 10px rgba(166, 124, 82, 0.3);">
-                        <i class="bi bi-file-earmark-excel"></i> Export
-                    </a>
-                </div>
-            </div>
-            <div class="card-body">
-                <form method="GET" action="{{ url_for('index') }}">
-                    <div class="row g-2">
-                        <div class="col-md-6">
-                            <select class="form-select" name="month">
-                                <option value="">All Months</option>
-                                {% for m in range(1, 13) %}
-                                <option value="{{ m }}" {% if current_month==m %}selected{% endif %}>{{ m }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <select class="form-select" name="year">
-                                <option value="">All Years</option>
-                                {% for y in years %}
-                                <option value="{{ y }}" {% if current_year==y %}selected{% endif %}>{{ y }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-12">
-                            <button type="submit" class="btn btn-secondary w-100">Filter</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+<script>
+    // Toggle function removed - now using Bootstrap modal for Add Transaction
+</script>
 
-    <div class="col-md-8">
+<div class="row">
+    <div class="col-md-12">
         <!-- Recurring Items Due Widget -->
         {% if pending_recurring %}
         <div class="card mb-3 border-primary">
@@ -161,25 +207,49 @@
         {% endif %}
 
         <div class="card">
-            <div class="card-header bg-white">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Recent Transactions</h5>
+                <button id="deleteSelectedBtn" class="btn btn-danger btn-sm" style="display: none;"
+                    onclick="deleteSelectedTransactions()">
+                    <i class="bi bi-trash"></i> Delete Selected (<span id="selectedCount">0</span>)
+                </button>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
+                <table class="table table-hover mb-0" id="transactionsTable">
                     <caption class="visually-hidden">List of recent financial transactions</caption>
                     <thead class="table-light">
                         <tr>
-                            <th>Date</th>
-                            <th>Category</th>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="selectAll" class="form-check-input" title="Select All">
+                            </th>
+                            <th style="cursor: pointer;" onclick="sortTable('category')" title="Click to sort">
+                                Category <i class="bi bi-arrow-down-up"></i>
+                            </th>
                             <th>Description</th>
-                            <th>Amount</th>
+                            <th style="cursor: pointer;" onclick="sortTable('amount')" title="Click to sort">
+                                Amount <i class="bi bi-arrow-down-up"></i>
+                            </th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
+                        {% set current_date = namespace(value=None) %}
                         {% for transaction in transactions %}
-                        <tr>
-                            <td>{{ transaction.date.strftime('%Y-%m-%d') }}</td>
+                        {% if current_date.value != transaction.date %}
+                        {% set current_date.value = transaction.date %}
+                        <tr class="table-secondary">
+                            <td colspan="6" class="fw-bold py-2">
+                                <i class="bi bi-calendar3"></i> {{ transaction.date.strftime('%a, %d-%m-%Y') }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        <tr data-transaction-id="{{ transaction.id }}"
+                            data-date="{{ transaction.date.strftime('%Y-%m-%d') }}"
+                            data-category="{{ transaction.category }}" data-amount="{{ transaction.amount }}">
+                            <td>
+                                <input type="checkbox" class="form-check-input transaction-checkbox"
+                                    value="{{ transaction.id }}">
+                            </td>
                             <td>{{ transaction.category }}</td>
                             <td>{{ transaction.description }}</td>
                             <td class="{{ 'text-success' if transaction.amount > 0 else 'text-danger' }}">
@@ -419,6 +489,133 @@
                 });
             }
         });
+
+        // Bulk Delete Functionality
+        const selectAllCheckbox = document.getElementById('selectAll');
+        const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
+        const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+        const selectedCountSpan = document.getElementById('selectedCount');
+
+        // Select All functionality
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function () {
+                transactionCheckboxes.forEach(checkbox => {
+                    checkbox.checked = this.checked;
+                });
+                updateDeleteButtonVisibility();
+            });
+        }
+
+        // Individual checkbox changes
+        transactionCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateDeleteButtonVisibility);
+        });
+
+        function updateDeleteButtonVisibility() {
+            const checkedBoxes = document.querySelectorAll('.transaction-checkbox:checked');
+            const count = checkedBoxes.length;
+
+            if (count > 0) {
+                deleteSelectedBtn.style.display = 'block';
+                selectedCountSpan.textContent = count;
+            } else {
+                deleteSelectedBtn.style.display = 'none';
+                selectAllCheckbox.checked = false;
+            }
+        }
+
+        // Bulk delete function
+        window.deleteSelectedTransactions = function () {
+            const checkedBoxes = document.querySelectorAll('.transaction-checkbox:checked');
+            const ids = Array.from(checkedBoxes).map(cb => cb.value);
+
+            if (ids.length === 0) return;
+
+            if (!confirm(`Are you sure you want to delete ${ids.length} transaction(s)? This action cannot be undone.`)) {
+                return;
+            }
+
+            fetch('/api/transactions/bulk-delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ids: ids })
+            }).then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to delete transactions');
+                }
+            }).catch(error => {
+                console.error('Error:', error);
+                alert('Error deleting transactions');
+            });
+        };
+
+        // Sorting functionality
+        let currentSort = { column: null, direction: 'asc' };
+
+        window.sortTable = function (column) {
+            const table = document.getElementById('transactionsTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            // Toggle sort direction
+            if (currentSort.column === column) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = column;
+                currentSort.direction = 'asc';
+            }
+
+            // Sort rows
+            rows.sort((a, b) => {
+                let aVal, bVal;
+
+                if (column === 'date') {
+                    aVal = a.getAttribute('data-date');
+                    bVal = b.getAttribute('data-date');
+                } else if (column === 'category') {
+                    aVal = a.getAttribute('data-category').toLowerCase();
+                    bVal = b.getAttribute('data-category').toLowerCase();
+                } else if (column === 'amount') {
+                    aVal = parseFloat(a.getAttribute('data-amount'));
+                    bVal = parseFloat(b.getAttribute('data-amount'));
+                }
+
+                if (aVal < bVal) return currentSort.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return currentSort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+
+            // Update sort indicators
+            updateSortIndicators(column);
+        };
+
+        function updateSortIndicators(activeColumn) {
+            const headers = document.querySelectorAll('#transactionsTable thead th');
+            headers.forEach(th => {
+                const icon = th.querySelector('i');
+                if (icon) {
+                    icon.className = 'bi bi-arrow-down-up';
+                }
+            });
+
+            const activeHeader = Array.from(headers).find(th =>
+                th.getAttribute('onclick') && th.getAttribute('onclick').includes(activeColumn)
+            );
+
+            if (activeHeader) {
+                const icon = activeHeader.querySelector('i');
+                if (icon) {
+                    icon.className = currentSort.direction === 'asc' ? 'bi bi-arrow-up' : 'bi bi-arrow-down';
+                }
+            }
+        }
     });
 </script>
 
@@ -747,6 +944,15 @@
         setTimeout(() => toast.remove(), 3000);
     }
 </script>
+
+<!-- Floating Action Button (FAB) for Add Transaction -->
+<button class="btn btn-success"
+    style="position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; font-size: 28px; box-shadow: 0 6px 20px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; padding: 0; z-index: 1000; transition: all 0.3s ease;"
+    data-bs-toggle="modal" data-bs-target="#addTransactionModal"
+    onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,0.4)';"
+    onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.3)';">
+    <i class="bi bi-plus"></i>
+</button>
 
 {% endblock %}
 {% endblock %}

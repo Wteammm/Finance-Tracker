@@ -4,10 +4,12 @@
 {% block dashboard_title %}Net Worth{% endblock %}
 
 {% block top_nav %}
-<button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#addMortgageModal">
+<button class="btn btn-sm" data-bs-toggle="modal" data-bs-target="#addMortgageModal"
+    style="background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 6px; color: white !important; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); border: none;">
     <i class="bi bi-bank"></i> Add Mortgage
 </button>
-<button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#addManualItemModal">
+<button class="btn btn-sm" data-bs-toggle="modal" data-bs-target="#addManualItemModal"
+    style="background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 6px; color: white !important; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); border: none;">
     <i class="bi bi-plus-circle"></i> Add Manual Item
 </button>
 {% endblock %}
