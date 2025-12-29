@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block dashboard %}Import Review{% endblock %}
+{% block dashboard_title %}Review Import{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <form action="{{ url_for('confirm_import') }}" method="POST">
+
+            {% if duplicates %}
+            <div class="card mb-4 border-warning">
+                <div class="card-header bg-warning text-dark fw-bold">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> Potential Duplicates Detected
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 40px;"><input type="checkbox" class="form-check-input"
+                                            id="checkAllDupes"></th>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in duplicates %}
+                                <tr class="table-warning">
+                                    <td>
+                                        <input type="checkbox" class="form-check-input dupe-check" name="import_indices"
+                                            value="{{ item.index }}">
+                                    </td>
+                                    <td>{{ item.date }}</td>
+                                    <td>{{ item.description }}</td>
+                                    <td>{{ item.category }}</td>
+                                    <td class="{{ 'text-success' if item.amount > 0 else 'text-danger' }}">
+                                        {{ item.amount }}
+                                    </td>
+                                    <td><small class="text-muted">{{ item.duplicate_reason }}</small></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-light">
+                    <small class="text-muted">Unchecked items will be skipped.</small>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card mb-4 border-success">
+                <div class="card-header bg-success text-white fw-bold">
+                    <i class="bi bi-check-circle-fill me-2"></i> New Transactions
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 40px;"><input type="checkbox" class="form-check-input"
+                                            id="checkAllNew" checked></th>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in new_items %}
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" class="form-check-input new-check" name="import_indices"
+                                            value="{{ item.index }}" checked>
+                                    </td>
+                                    <td>{{ item.date }}</td>
+                                    <td>{{ item.description }}</td>
+                                    <td>{{ item.category }}</td>
+                                    <td class="{{ 'text-success' if item.amount > 0 else 'text-danger' }}">
+                                        {{ item.amount }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mb-5">
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary fw-bold px-4">
+                    <i class="bi bi-save me-2"></i> Confirm Import
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<script>
+    // Toggle All Logic
+    document.getElementById('checkAllDupes')?.addEventListener('change', function () {
+        document.querySelectorAll('.dupe-check').forEach(c => c.checked = this.checked);
+    });
+
+    document.getElementById('checkAllNew')?.addEventListener('change', function () {
+        document.querySelectorAll('.new-check').forEach(c => c.checked = this.checked);
+    });
+</script>
+{% endblock %}

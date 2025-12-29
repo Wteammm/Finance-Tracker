@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block dashboard %}settings{% endblock %}
+{% block dashboard_title %}Email Settings{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h4 class="mb-0"><i class="bi bi-envelope-gear"></i> Email Configuration</h4>
+                <small class="text-muted">Configure Gmail SMTP for sending AR payment reminders</small>
+            </div>
+            <div class="card-body">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
+
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> <strong>Gmail Setup Required:</strong>
+                    <ol class="mb-0 mt-2">
+                        <li>Go to your Google Account settings</li>
+                        <li>Enable 2-Step Verification</li>
+                        <li>Create an <strong>App Password</strong> (not your regular password)</li>
+                        <li>Use that App Password below</li>
+                    </ol>
+                    <a href="https://support.google.com/accounts/answer/185833" target="_blank"
+                        class="btn btn-sm btn-outline-primary mt-2">
+                        <i class="bi bi-box-arrow-up-right"></i> How to create App Password
+                    </a>
+                </div>
+
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Gmail Address</label>
+                        <input type="email" class="form-control" name="email" value="{{ config.get('email', '') }}"
+                            placeholder="your.email@gmail.com" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Gmail App Password</label>
+                        <input type="password" class="form-control" name="app_password"
+                            value="{{ config.get('app_password', '') }}" placeholder="16-character app password"
+                            required>
+                        <div class="form-text">NOT your regular Gmail password - use an App Password</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Sender Name</label>
+                        <input type="text" class="form-control" name="sender_name"
+                            value="{{ config.get('sender_name', 'Finance Tracker') }}" placeholder="Finance Tracker">
+                        <div class="form-text">Name that appears in emails</div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">SMTP Server</label>
+                            <input type="text" class="form-control" name="smtp_server"
+                                value="{{ config.get('smtp_server', 'smtp.gmail.com') }}" readonly>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">SMTP Port</label>
+                            <input type="number" class="form-control" name="smtp_port"
+                                value="{{ config.get('smtp_port', 587) }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-save"></i> Save Email Settings
+                        </button>
+                    </div>
+                </form>
+
+                <hr class="my-4">
+
+                <h5><i class="bi bi-envelope-check"></i> Test Email Configuration</h5>
+                <form method="POST" action="{{ url_for('test_ar_email') }}" class="mt-3">
+                    <div class="input-group">
+                        <input type="email" class="form-control" name="test_email"
+                            placeholder="Enter email to send test" required>
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="bi bi-send"></i> Send Test Email
+                        </button>
+                    </div>
+                    <div class="form-text">Send a test email to verify your configuration</div>
+                </form>
+            </div>
+        </div>
+
+        <div class="mt-3 text-center">
+            <a href="{{ url_for('balance_sheet') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Balance Sheet
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

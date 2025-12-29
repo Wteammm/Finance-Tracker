@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <a href="{{ url_for('balance_sheet') }}" class="btn btn-outline-secondary mb-3">&larr; Back to Balance Sheet</a>
+        <h2 class="mb-3">{{ mortgage.name }}</h2>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-primary text-white mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Outstanding Principal</h5>
+                <h2 class="fw-bold">MYR {{ current_balance|comma }}</h2>
+                <small>Original: {{ mortgage.original_principal|comma }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Current Interest Rate</h5>
+                <h2 class="fw-bold">{{ "%.2f"|format(current_rate) }}%</h2>
+                <small>Variable</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card {{ 'bg-success' if net_exposure <= 0 else 'bg-warning' }} text-white mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Net Exposure</h5>
+                <h2 class="fw-bold">MYR {{ net_exposure|comma }}</h2>
+                <small>Balance - MRTA Coverage ({{ current_mrta|comma }})</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#paymentModal">
+            <i class="bi bi-cash-coin"></i> Record Payment
+        </button>
+        <button class="btn btn-warning me-2" data-bs-toggle="modal" data-bs-target="#rateModal">
+            <i class="bi bi-graph-up-arrow"></i> Update Interest Rate
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Amortization Schedule</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-striped mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Month</th>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Rate (%)</th>
+                    <th>Payment</th>
+                    <th>Interest</th>
+                    <th>Principal</th>
+                    <th>Loan Balance</th>
+                    <th>MRTA Cover</th>
+                    <th>Net Exposure</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in schedule %}
+                <tr class="{{ 'table-info' if row.type == 'Projected' else '' }}">
+                    <td>{{ row.no }}</td>
+                    <td>{{ row.date.strftime('%d-%b-%Y') }}</td>
+                    <td>
+                        {% if row.type == 'Projected' %}
+                        <span class="badge text-bg-info">Projected</span>
+                        {% else %}
+                        <span class="badge text-bg-secondary">History</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ "%.2f"|format(row.rate) }}%</td>
+                    <td>{{ row.payment|comma }}</td>
+                    <td>{{ row.interest_paid|comma }}</td>
+                    <td>{{ row.principal_paid|comma }}</td>
+                    <td class="fw-bold">{{ row.balance|comma }}</td>
+                    <td class="text-muted">{{ row.mrta_coverage|comma }}</td>
+                    <td class="{{ 'text-success' if row.net_exposure <= 0 else 'text-danger' }}">
+                        {{ row.net_exposure|comma }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Danger Zone (Collapsible) -->
+<div class="card border-danger mt-4">
+    <div class="card-header bg-danger-subtle">
+        <a class="text-danger text-decoration-none d-flex justify-content-between align-items-center"
+            data-bs-toggle="collapse" href="#dangerZone" role="button" aria-expanded="false">
+            <strong><i class="bi bi-exclamation-triangle-fill"></i> Danger Zone</strong>
+            <i class="bi bi-chevron-down"></i>
+        </a>
+    </div>
+    <div class="collapse" id="dangerZone">
+        <div class="card-body">
+            <p class="text-muted mb-3">Once you delete this mortgage, all payment history and amortization data will be
+                permanently removed. This action cannot be undone.</p>
+            <form action="{{ url_for('delete_mortgage', id=mortgage.id) }}" method="POST" class="d-inline">
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Permanently Delete This Mortgage
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Record Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('add_mortgage_payment', id=mortgage.id) }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Payment Date</label>
+                        <input type="date" class="form-control" name="date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (Principal Reduction)</label>
+                        <input type="number" step="0.01" class="form-control" name="amount" required>
+                        <div class="form-text">Currently, please enter the Principal portion of your payment.</div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">Save Payment</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rate Modal -->
+<div class="modal fade" id="rateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Interest Rate</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('update_mortgage_rate', id=mortgage.id) }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Effective Date</label>
+                        <input type="date" class="form-control" name="date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">New Annual Rate (%)</label>
+                        <input type="number" step="0.01" class="form-control" name="new_rate" required>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-warning">Update Rate</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

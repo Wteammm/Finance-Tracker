@@ -1,0 +1,1239 @@
+{% extends 'base.html' %}
+
+{% block dashboard %}net-worth{% endblock %}
+{% block dashboard_title %}Net Worth{% endblock %}
+
+{% block top_nav %}
+<button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#addMortgageModal">
+    <i class="bi bi-bank"></i> Add Mortgage
+</button>
+<button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#addManualItemModal">
+    <i class="bi bi-plus-circle"></i> Add Manual Item
+</button>
+{% endblock %}
+
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <button class="btn" data-bs-toggle="modal" data-bs-target="#importBalanceModal"
+                style="background: linear-gradient(135deg, #c9a66b 0%, #a67c52 100%); color: white; font-weight: 700; border: none; padding: 0.75rem 1.5rem; border-radius: 10px; box-shadow: 0 5px 15px rgba(166, 124, 82, 0.4); margin-right: 10px;">
+                <i class="bi bi-upload"></i> Import from Excel
+            </button>
+            <a href="{{ url_for('balance_sheet_export') }}" class="btn"
+                style="background: linear-gradient(135deg, #c9a66b 0%, #a67c52 100%); color: white !important; font-weight: 700; border: none; padding: 0.75rem 1.5rem; border-radius: 10px; box-shadow: 0 5px 15px rgba(166, 124, 82, 0.4);">
+                <i class="bi bi-file-earmark-excel"></i> Export to Excel
+            </a>
+        </div>
+    </div>
+</div>
+<div class="row mb-4">
+    <div class="col-12 text-center">
+        <div class="card bg-primary text-white">
+            <div class="card-body py-4">
+                <h5 class="card-title">Net Worth</h5>
+                <h1 class="display-4 fw-bold">MYR {{ net_worth|comma }}</h1>
+                <div class="d-flex justify-content-center gap-4 mt-2">
+                    <div>
+                        <small class="opacity-75">Total Assets</small>
+                        <div class="fs-4">{{ total_assets|comma }}</div>
+                    </div>
+                    <div>
+                        <small class="opacity-75">Total Liabilities</small>
+                        <div class="fs-4">{{ total_liabilities|comma }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="row">
+    <!-- ... Assets ... -->
+
+    <!-- ... Liabilities ... -->
+
+    <!-- ... Existing Modal ... -->
+
+    <!-- Add Mortgage Modal -->
+    <div class="modal fade" id="addMortgageModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Mortgage Loan</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="{{ url_for('add_mortgage') }}" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Loan Name</label>
+                            <input type="text" class="form-control" name="name" placeholder="e.g. Home Loan" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Start Date</label>
+                            <input type="date" class="form-control" name="start_date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Original Principal (MYR)</label>
+                            <input type="number" step="0.01" class="form-control" name="original_principal" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Loan Term (Years)</label>
+                            <input type="number" class="form-control" name="term_years" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Initial Interest Rate (%)</label>
+                            <input type="number" step="0.01" class="form-control" name="initial_rate" required>
+                        </div>
+
+                        <hr>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="has_mrta" name="has_mrta">
+                            <label class="form-check-label" for="has_mrta">
+                                Includes MRTA (Insurance)
+                            </label>
+                        </div>
+                        <div id="mrta-fields" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label">MRTA Original Coverage</label>
+                                <input type="number" step="0.01" class="form-control" name="mrta_original_amount">
+                                <div class="form-text">Usually matches Loan Principal</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">MRTA Assumed Rate (%)</label>
+                                <input type="number" step="0.01" class="form-control" name="mrta_rate" value="4.0">
+                                <div class="form-text">Rate used for coverage reduction schedule</div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Create Mortgage</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Manual Item Modal -->
+    <div class="modal fade" id="addManualItemModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Manual Balance Sheet Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="{{ url_for('balance_sheet') }}" method="POST" id="balanceItemForm">
+                        <div class="mb-3">
+                            <label class="form-label">Classification</label>
+                            <select class="form-control" name="classification" required>
+                                <option value="">-- Select --</option>
+                                <option value="Current Asset">Current Asset</option>
+                                <option value="Non-Current Asset">Non-Current Asset</option>
+                                <option value="Current Liability">Current Liability</option>
+                                <option value="Non-Current Liability">Non-Current Liability</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" name="name" placeholder="e.g. Savings Account"
+                                required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Value (MYR)</label>
+                            <input type="number" step="0.01" class="form-control" name="value" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Asset Type (for Current Assets)</label>
+                            <select class="form-control" name="asset_type">
+                                <option value="">-- Optional --</option>
+                                <option value="Cash">Cash</option>
+                                <option value="AR">Accounts Receivable</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <div class="form-text">Used for grouping in Cash Flow view</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Liquidity Tier (for Cash)</label>
+                            <select class="form-control" name="liquidity_tier">
+                                <option value="">-- Optional --</option>
+                                <option value="Tier 1">Tier 1 - Immediate</option>
+                                <option value="Tier 2">Tier 2 - 1-3 Days</option>
+                                <option value="Tier 3">Tier 3 - 3+ Days</option>
+                            </select>
+                            <div class="form-text">For cash accounts only</div>
+                        </div>
+
+                        <!-- Email Reminder Fields for AR -->
+                        <div id="ar_email_fields" style="display:none;">
+                            <div class="mb-3 bg-light p-3 rounded">
+                                <h6 class="text-success"><i class="bi bi-envelope"></i> Email Reminder Settings</h6>
+                                <div class="mb-2">
+                                    <label class="form-label">Contact Email</label>
+                                    <input type="email" class="form-control" name="contact_email"
+                                        placeholder="person@example.com">
+                                    <div class="form-text">Email address to send payment reminders</div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Contact Phone (Optional)</label>
+                                    <input type="text" class="form-control" name="contact_phone"
+                                        placeholder="+60 12-345 6789">
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="auto_reminder_enabled"
+                                        id="auto_reminder_add">
+                                    <label class="form-check-label" for="auto_reminder_add">
+                                        Enable automatic reminders
+                                    </label>
+                                    <div class="form-text">System will send reminders automatically (future feature)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Add Item</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div class="modal fade" id="historyModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="historyModalTitle">History</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Quick Add Form -->
+                    <form id="historyAddForm" class="d-flex gap-2 mb-3">
+                        <input type="hidden" id="historyItemId" name="item_id">
+                        <input type="text" name="description" class="form-control form-control-sm"
+                            placeholder="Description (e.g. Lunch)" required>
+                        <input type="number" name="amount" class="form-control form-control-sm" placeholder="Amount"
+                            step="0.01" style="width: 100px;" required>
+                        <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-plus"></i> Add</button>
+                    </form>
+
+                    <!-- History Table -->
+                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-sm table-striped small mb-0">
+                            <thead class="text-muted">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th class="text-end">Adj.</th>
+                                    <th class="text-end">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyModalBody">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ... (Existing script content for MRTA and prefill) ...
+        document.getElementById('has_mrta').addEventListener('change', function () {
+            document.getElementById('mrta-fields').style.display = this.checked ? 'block' : 'none'
+        });
+
+        // Show/hide AR email fields based on asset type
+        const assetTypeSelect = document.querySelector('select[name="asset_type"]');
+        const arEmailFields = document.getElementById('ar_email_fields');
+
+        if (assetTypeSelect && arEmailFields) {
+            assetTypeSelect.addEventListener('change', function () {
+                arEmailFields.style.display = this.value === 'AR' ? 'block' : 'none';
+            });
+        }
+
+        // Prefill Add Manual Item modal based on category
+        function prefillModal(classification, assetType) {
+            // Wait for modal to be shown
+            const modal = document.getElementById('addManualItemModal');
+            modal.addEventListener('shown.bs.modal', function () {
+                // Set classification
+                const classificationSelect = modal.querySelector('select[name="classification"]');
+                if (classificationSelect) {
+                    classificationSelect.value = classification;
+                }
+
+                // Set asset type
+                const assetTypeSelect = modal.querySelector('select[name="asset_type"]');
+                if (assetTypeSelect && assetType) {
+                    assetTypeSelect.value = assetType;
+                }
+            }, { once: true });
+        }
+
+
+        // NEW: Open History Modal
+        function openHistoryModal(id, name) {
+            // 1. Set Title
+            document.getElementById('historyModalTitle').textContent = 'History: ' + name;
+
+            // 2. Set Hidden ID
+            document.getElementById('historyItemId').value = id;
+
+            // 3. Clear existing table & loader
+            const tbody = document.getElementById('historyModalBody');
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted"><div class="spinner-border spinner-border-sm" role="status"></div> Loading...</td></tr>';
+
+            // 4. Show Modal
+            const myModal = new bootstrap.Modal(document.getElementById('historyModal'));
+            myModal.show();
+
+            // 5. Fetch Data
+            fetch(`/balance_sheet/history/${id}`)
+                .then(response => response.json())
+                .then(data => {
+                    tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted fst-italic">No history found</td></tr>';
+                        return;
+                    }
+                    data.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${row.date}</td>
+                            <td>${row.description || '-'}</td>
+                            <td class="text-end ${row.adjustment >= 0 ? 'text-success' : 'text-danger'}">
+                                ${row.adjustment > 0 ? '+' : ''}${parseFloat(row.adjustment).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td class="text-end fw-bold">${parseFloat(row.new_value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading history</td></tr>';
+                });
+        }
+
+        // NEW: Submit History Form
+        document.getElementById('historyAddForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const btn = this.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...';
+            btn.disabled = true;
+
+            const id = document.getElementById('historyItemId').value;
+            const formData = new FormData(this);
+
+            fetch(`/balance_sheet/add_history/${id}`, {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload(); // Reload to update main balance
+                    } else {
+                        alert('Error: ' + data.error);
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred');
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                });
+        });
+
+    </script>
+    <div class="row">
+        <!-- ASSETS COLUMN -->
+        <div class="col-md-6">
+            <h4 class="text-success mb-3"><i class="bi bi-arrow-up-circle"></i> Assets</h4>
+
+            <!-- Current Assets (Tiered) -->
+            <div class="card mb-4 border-success-subtle">
+                <div
+                    class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Current Assets</h5>
+                    <span class="fw-bold">{{ total_current_assets|comma }}</span>
+                </div>
+
+                <ul class="list-group list-group-flush" id="currentAssetsAccordion">
+
+                    <!-- Helper Macro for List Items -->
+                    {% macro render_tier_items(items) %}
+                    {% for item in items %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center {% if item.id %}manual-item-row{% endif %}"
+                        {% if item.id %}data-id="{{ item.id }}" data-name="{{ item.name }}"
+                        data-value="{{ item.value }}" data-tier="{{ item.liquidity_tier }}"
+                        data-asset-type="{{ item.asset_type }}" {% endif %}>
+                        <div>
+                            {{ item.name }}
+                            {% if item.is_auto %} <span class="badge text-bg-info ms-2">Auto</span> {% endif %}
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span>{{ item.value|comma }}</span>
+                        </div>
+                    </li>
+                    {% endfor %}
+                    {% endmacro %}
+
+                    <!-- All Current Assets (Grouped by Type with Subtotals) -->
+                    {% for type_name, group_data in assets.current_grouped.items() %}
+                    <!-- Category Header with Subtotal -->
+                    <li class="list-group-item bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-2">
+                                <strong>{{ type_name }}</strong>
+                                <button type="button" class="btn btn-sm btn-link text-success p-0"
+                                    data-bs-toggle="modal" data-bs-target="#addManualItemModal"
+                                    onclick="prefillModal('Current Asset', '{{ type_name }}')"
+                                    aria-label="Add new {{ type_name }} item">
+                                    <i class="bi bi-plus-circle"></i>
+                                </button>
+                            </div>
+                            <strong class="text-primary">{{ group_data.total|comma }}</strong>
+                        </div>
+                    </li>
+
+                    <!-- Items in this category -->
+                    {% for item in group_data.item_list %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center {% if not item.is_auto %}manual-item-row{% endif %} ps-4"
+                        {% if not item.is_auto %}data-id="{{ item.id }}" data-name="{{ item.name }}"
+                        data-value="{{ item.value }}" data-tier="{{ item.liquidity_tier }}" {% endif %}>
+                        <div>
+                            {{ item.name }}
+                            {% if item.liquidity_tier %}
+                            <span class="badge 
+                                {% if item.liquidity_tier == 'High' %}bg-success
+                                {% elif item.liquidity_tier == 'Medium' %}bg-warning
+                                {% elif item.liquidity_tier == 'Low' %}bg-secondary
+                                {% else %}bg-light text-dark{% endif %} ms-2">{{ item.liquidity_tier }}</span>
+                            {% endif %}
+                            {% if item.is_auto %}
+                            <span class="badge text-bg-info ms-2">Auto</span>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span>{{ item.value|comma }}</span>
+                        </div>
+                    </li>
+
+                    </li>
+
+                    {% endfor %}
+                    {% else %}
+                    <li class="list-group-item text-muted text-center fst-italic">No items</li>
+                    {% endfor %}
+
+
+                </ul>
+            </div>
+
+            <!-- Non-Current Assets -->
+            <div class="card mb-4 border-success-subtle">
+                <div
+                    class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Non-Current Assets</h5>
+                    <span class="fw-bold">{{ total_non_current_assets|comma }}</span>
+                </div>
+                <ul class="list-group list-group-flush">
+                    <!-- Investment Portfolio (Auto) - Expandable -->
+                    <li class="list-group-item">
+                        <a class="text-decoration-none d-flex justify-content-between align-items-center"
+                            data-bs-toggle="collapse" href="#investmentBreakdown" role="button" aria-expanded="false">
+                            <div>
+                                Investment Portfolio (Auto)
+                                <span class="badge text-bg-info ms-2">Auto</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold">{{ assets.non_current.investment_portfolio.total|comma }}</span>
+                                <i class="bi bi-chevron-down"></i>
+                            </div>
+                        </a>
+
+                        <!-- Breakdown by Market -->
+                        <div class="collapse mt-2" id="investmentBreakdown">
+                            <ul class="list-group list-group-flush">
+                                {% for item in assets.non_current.investment_portfolio.breakdown %}
+                                {% if item.value > 0 %}
+                                <li
+                                    class="list-group-item d-flex justify-content-between align-items-center ps-4 py-2 border-0 bg-light">
+                                    <small class="text-muted">{{ item.name }}</small>
+                                    <small>{{ item.value|comma }}</small>
+                                </li>
+                                {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </li>
+
+                    <!-- Manual Non-Current Assets (EPF, Pension, etc.) -->
+                    {% for item in assets.non_current.manual_items %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center manual-item-row"
+                        data-id="{{ item.id }}" data-name="{{ item.name }}" data-value="{{ item.value }}" data-tier="">
+                        <div>{{ item.name }}</div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span>{{ item.value|comma }}</span>
+                        </div>
+                    </li>
+                    <!-- Collapsible Breakdown -->
+                    <div class="collapse" id="breakdown-{{ item.id }}">
+                        <div class="card card-body bg-light border-0 shadow-inner mb-3 ms-4 me-4">
+                            <h6 class="text-secondary small fw-bold mb-2">Item Breakdown & History</h6>
+
+                            <!-- Quick Add Form -->
+                            <form id="add-history-form-{{ item.id }}" onsubmit="submitHistory(event, '{{ item.id }}')"
+                                class="d-flex gap-2 mb-3">
+                                <input type="text" name="description" class="form-control form-control-sm"
+                                    placeholder="Description (e.g. Lunch)" required>
+                                <input type="number" name="amount" class="form-control form-control-sm"
+                                    placeholder="Amount" step="0.01" style="width: 100px;" required>
+                                <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-plus"></i>
+                                    Add</button>
+                            </form>
+
+                            <!-- History Table -->
+                            <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                                <table class="table table-sm table-borderless small mb-0">
+                                    <thead class="text-muted">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Description</th>
+                                            <th class="text-end">Amount</th>
+                                            <th class="text-end">Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="history-body-{{ item.id }}">
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted">
+                                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                                                Loading...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- LIABILITIES COLUMN -->
+        <div class="col-md-6">
+            <h4 class="text-danger mb-3"><i class="bi bi-arrow-down-circle"></i> Liabilities</h4>
+
+            <!-- Current Liabilities -->
+            <div class="card mb-4 border-danger-subtle">
+                <div
+                    class="card-header bg-danger-subtle text-danger-emphasis d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Current Liabilities</h5>
+                    <span class="fw-bold">{{ total_current_liabilities|comma }}</span>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for item in liabilities.current %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center {% if not item.is_auto %}manual-item-row{% endif %}"
+                        {% if not item.is_auto %}data-id="{{ item.id }}" data-name="{{ item.name }}"
+                        data-value="{{ item.value }}" {% endif %}>
+                        <div>
+                            {% if item.asset_type and item.asset_type != 'Other' %}
+                            <span class="text-muted">{{ item.asset_type }}:</span>
+                            {% endif %}
+                            {{ item.name }}
+                            {% if item.is_auto %}
+                            <span class="badge text-bg-info ms-2">Auto</span>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span>{{ item.value|comma }}</span>
+                        </div>
+                    </li>
+
+                    {% else %}
+                    <li class="list-group-item text-muted text-center fst-italic">No items</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Non-Current Liabilities -->
+            <div class="card mb-4 border-danger-subtle">
+                <div
+                    class="card-header bg-danger-subtle text-danger-emphasis d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Non-Current Liabilities</h5>
+                    <span class="fw-bold">{{ total_non_current_liabilities|comma }}</span>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for item in liabilities.non_current %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center {% if not item.is_auto %}manual-item-row{% endif %}"
+                        {% if not item.is_auto %}data-id="{{ item.id }}" data-name="{{ item.name }}"
+                        data-value="{{ item.value }}" {% endif %}>
+                        <div>
+                            {% if item.asset_type and item.asset_type != 'Other' %}
+                            <span class="text-muted">{{ item.asset_type }}:</span>
+                            {% endif %}
+                            {% if item.link %}
+                            <a href="{{ item.link }}" class="text-decoration-none fw-bold">{{ item.name }}</a>
+                            {% else %}
+                            {{ item.name }}
+                            {% endif %}
+
+                            {% if item.is_auto %}
+                            <span class="badge text-bg-info ms-2">Auto</span>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span>{{ item.value|comma }}</span>
+                        </div>
+                    </li>
+
+                    {% else %}
+                    <li class="list-group-item text-muted text-center fst-italic">No items</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Item Modal -->
+    <div class="modal fade" id="addItemModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Balance Sheet Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="{{ url_for('balance_sheet') }}" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Classification</label>
+                            <select class="form-select" name="classification" id="add_class" required>
+                                <option value="Current Asset">Current Asset</option>
+                                <option value="Non-Current Asset">Non-Current Asset</option>
+                                <option value="Current Liability">Current Liability</option>
+                                <option value="Non-Current Liability">Non-Current Liability</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Item Type</label>
+                            <input type="text" class="form-control" name="asset_type" id="add_type"
+                                list="assetTypesList" placeholder="e.g. Cash, Emergency Fund, Credit Card Debt">
+                            <datalist id="assetTypesList">
+                                <option value="Cash">Cash & Cash Equivalents</option>
+                                <option value="AR">Accounts Receivable</option>
+                                <option value="Emergency Fund">Emergency Fund</option>
+                                <option value="Savings">Savings</option>
+                                <option value="Credit Card">Credit Card Debt</option>
+                                <option value="Family Loan">Family Loan</option>
+                                <option value="Other">Other / Unspecified</option>
+                            </datalist>
+                            <div class="form-text">Type any custom category for assets or liabilities</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Liquidity Tier</label>
+                            <select class="form-select" name="liquidity_tier" id="add_tier">
+                                <option value="">None / Not Applicable</option>
+                                <option value="High">High (e.g. Cash, Checking)</option>
+                                <option value="Medium">Medium (e.g. Savings, Money Market)</option>
+                                <option value="Low">Low (e.g. FDs, Locked)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Obligation Type</label>
+                            <select class="form-select" name="obligation_type" id="add_obligation_type">
+                                <option value="Standard">Standard</option>
+                                <option value="Held on Behalf">Held on Behalf</option>
+                                <option value="On Hold">On Hold</option>
+                            </select>
+                            <div class="form-text">For liabilities: categorize as standard debt, money held for others,
+                                or locked funds</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Item Name</label>
+                            <input type="text" class="form-control" name="name" placeholder="e.g. Condo Downpayment"
+                                required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Value (MYR)</label>
+                            <input type="number" step="0.01" class="form-control" name="value" placeholder="0.00"
+                                required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Add Item</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Item Modal -->
+    <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editForm" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" name="name" id="edit_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Liquidity Tier</label>
+                            <select class="form-select" name="liquidity_tier" id="edit_tier">
+                                <option value="">None / Not Applicable</option>
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                        </div>
+                        <!-- BF / Adjustment / CF Layout -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Brought Forward (BF)</label>
+                                <input type="number" step="0.01" class="form-control" id="edit_old_value"
+                                    name="old_value" title="Original Value">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Adjustment (+/-)</label>
+                                <input type="number" step="0.01" class="form-control" id="edit_adjustment"
+                                    placeholder="+/-">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Carried Forward (CF)</label>
+                                <input type="number" step="0.01" class="form-control fw-bold" name="value"
+                                    id="edit_value" required>
+                            </div>
+                        </div>
+                        <div class="form-text mt-0 mb-3 small fst-italic">CF automatically updates based on Adjustment.
+                        </div>
+
+                        <!-- Linked Transactions (Collapsible) -->
+                        <div class="mb-3">
+                            <button class="btn btn-sm btn-outline-secondary w-100" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#transactionHistory" aria-expanded="false">
+                                <i class="bi bi-clock-history"></i> Show Linked Transactions
+                            </button>
+                            <div class="collapse mt-2" id="transactionHistory">
+                                <div class="card card-body p-2 bg-light">
+                                    <div class="table-responsive" style="max-height: 200px;">
+                                        <table class="table table-sm table-borderless small mb-0" id="txn_table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Desc</th>
+                                                    <th class="text-end">Amt</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="txn_body">
+                                                <tr>
+                                                    <td colspan="3" class="text-center">Loading...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Balance Changes History (Collapsible) -->
+                        <div class="mb-3">
+                            <button class="btn btn-sm btn-outline-primary w-100" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#balanceHistory" aria-expanded="false">
+                                <i class="bi bi-file-text"></i> Show Balance Changes History
+                            </button>
+                            <div class="collapse mt-2" id="balanceHistory">
+                                <div class="card card-body p-2 bg-light">
+                                    <div class="table-responsive" style="max-height: 250px;">
+                                        <table class="table table-sm table-borderless small mb-0" id="history_table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th class="text-end">Old</th>
+                                                    <th class="text-end">Adj</th>
+                                                    <th class="text-end">New</th>
+                                                    <th>Transfer</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="history_body">
+                                                <tr>
+                                                    <td colspan="5" class="text-center">Loading...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h6 class="mb-3 text-primary"><i class="bi bi-arrow-left-right"></i> Contra / Transfer
+                            (Optional)</h6>
+                        <div class="mb-3 bg-light p-3 rounded">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="enable_contra" name="enable_contra">
+                                <label class="form-check-label fw-bold" for="enable_contra">Offset / Contra with another
+                                    account?</label>
+                            </div>
+
+                            <div id="contra_fields" style="display:none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Contra Account (Source/Destination)</label>
+                                    <select class="form-select" name="contra_item_id" id="contra_select">
+                                        <option value="">Select Account...</option>
+                                        <!-- Populated by JS -->
+                                    </select>
+                                    <div class="form-text small mt-2">
+                                        <i class="bi bi-info-circle"></i> The difference (New Value - Old Value) will be
+                                        <strong>deducted</strong> from this account.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+<!-- Custom Context Menu -->
+<div id="contextMenu" class="dropdown-menu"
+    style="display:none; position:fixed; z-index:10000; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+    <a class="dropdown-item" href="#" id="ctxEdit"><i class="bi bi-pencil me-2"></i>Edit</a>
+    <a class="dropdown-item" href="#" id="ctxHistory"><i class="bi bi-clock-history me-2"></i>History</a>
+    <a class="dropdown-item" href="#" id="ctxSendReminder" style="display:none;">
+        <i class="bi bi-envelope me-2"></i>Send Payment Reminder
+    </a>
+    <a class="dropdown-item text-danger" href="#" id="ctxDelete"><i class="bi bi-trash me-2"></i>Delete</a>
+</div>
+
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Delete</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="deleteItemName"></strong>?</p>
+                <p class="text-muted mb-0"><small>This action cannot be undone.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="bi bi-trash me-1"></i>Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Available Assets for Contra (Cash, AR, Other)
+    const availableAssets = [
+        {% for item in assets.current %}
+    {% if not item.is_auto %}
+    { id: "{{ item.id }}", name: "{{ item.name }}" },
+    {% endif %}
+    {% endfor %}
+    // Liabilities (AP, etc) - for Contra
+    {% for item in liabilities.current %}
+    { id: "{{ item.id }}", name: "{{ item.name }}" },
+    {% endfor %}
+    ];
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const contextMenu = document.getElementById('contextMenu');
+        const ctxEdit = document.getElementById('ctxEdit');
+        const ctxHistory = document.getElementById('ctxHistory');
+        const ctxDelete = document.getElementById('ctxDelete');
+        let currentId = null;
+        let currentName = null;
+        let currentValue = null;
+        let currentTier = null;
+
+        // Hide menu on click elsewhere
+        document.addEventListener('click', function () {
+            contextMenu.style.display = 'none';
+        });
+
+        // Attach context menu using event delegation
+        document.addEventListener('contextmenu', function (e) {
+            const row = e.target.closest('.manual-item-row');
+            if (row) {
+                e.preventDefault();
+                currentId = row.dataset.id;
+                currentName = row.dataset.name;
+                currentValue = row.dataset.value;
+                currentTier = row.dataset.tier;
+
+                contextMenu.style.display = 'block';
+                contextMenu.style.left = e.clientX + 'px';
+                contextMenu.style.top = e.clientY + 'px';
+            }
+        });
+
+        // Edit Action
+        ctxEdit.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (currentId) {
+                const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+                document.getElementById('editForm').action = '/balance_sheet/edit/' + currentId;
+                document.getElementById('edit_name').value = currentName;
+                document.getElementById('edit_value').value = currentValue;
+                document.getElementById('edit_old_value').value = currentValue; // Capture old value
+                document.getElementById('edit_adjustment').value = ""; // Reset adjustment
+
+                // Fetch Transactions
+                console.log('Fetching transactions for ID:', currentId);
+                fetch('/balance_sheet/transactions/' + currentId)
+                    .then(response => response.json())
+                    .then(data => {
+                        const tbody = document.getElementById('txn_body');
+                        tbody.innerHTML = '';
+                        if (data.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="3" class="text-center fst-italic">No linked transactions</td></tr>';
+                        } else {
+                            data.forEach(t => {
+                                const row = `<tr>
+                                    <td>${t.date}</td>
+                                    <td>${t.description}</td>
+                                    <td class="text-end ${t.amount < 0 ? 'text-danger' : 'text-success'}">${t.amount.toFixed(2)}</td>
+                                </tr>`;
+                                tbody.innerHTML += row;
+                            });
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error fetching transactions:', err);
+                        document.getElementById('txn_body').innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error loading transactions</td></tr>';
+                    });
+
+                // Fetch Balance Changes History
+                console.log('Fetching balance history for ID:', currentId);
+                fetch('/balance_sheet/history/' + currentId)
+                    .then(response => response.json())
+                    .then(data => {
+                        const historyBody = document.getElementById('history_body');
+                        historyBody.innerHTML = '';
+                        if (data.length === 0) {
+                            historyBody.innerHTML = '<tr><td colspan="5" class="text-center fst-italic">No balance changes recorded</td></tr>';
+                        } else {
+                            data.forEach(h => {
+                                const adjClass = h.adjustment > 0 ? 'text-success' : (h.adjustment < 0 ? 'text-danger' : '');
+                                const transferText = h.contra_account ? `→ ${h.contra_account}` : '-';
+                                const row = `<tr>
+                                    <td>${h.date}</td>
+                                    <td class="text-end">${h.old_value.toFixed(2)}</td>
+                                    <td class="text-end ${adjClass}">${h.adjustment >= 0 ? '+' : ''}${h.adjustment.toFixed(2)}</td>
+                                    <td class="text-end fw-bold">${h.new_value.toFixed(2)}</td>
+                                    <td><small>${transferText}</small></td>
+                                </tr>`;
+                                historyBody.innerHTML += row;
+                            });
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error fetching history:', err);
+                        document.getElementById('history_body').innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading history</td></tr>';
+                    });
+
+                // Populate Contra Dropdown
+                const contraSelect = document.getElementById('contra_select');
+                contraSelect.innerHTML = '<option value="">Select Account...</option>';
+                availableAssets.forEach(asset => {
+                    if (asset.id != currentId) {
+                        const option = document.createElement('option');
+                        option.value = asset.id;
+                        option.textContent = asset.name;
+                        contraSelect.appendChild(option);
+                    }
+                });
+
+                // Reset Contra Checkbox
+                document.getElementById('enable_contra').checked = false;
+                document.getElementById('contra_fields').style.display = 'none';
+
+                // Set Tier Logic
+                const tierSelect = document.getElementById('edit_tier');
+                if (currentTier && currentTier !== 'None') {
+                    tierSelect.value = currentTier;
+                } else {
+                    tierSelect.value = "";
+                }
+
+                editModal.show();
+            }
+        });
+
+        // Delete Action - show modal for confirmation
+        ctxDelete.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (currentId) {
+                // Show modal with item name
+                document.getElementById('deleteItemName').textContent = currentName;
+                const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+                deleteModal.show();
+            }
+        });
+
+        // History Action
+        ctxHistory.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (currentId) {
+                openHistoryModal(currentId, currentName);
+            }
+        });
+
+        // Confirm Delete Button in Modal
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
+            if (currentId) {
+                fetch('/balance_sheet/delete/' + currentId, { method: 'POST' })
+                    .then(response => {
+                        if (response.ok || response.redirected || response.status === 200) {
+                            window.location.reload();
+                        } else {
+                            alert('Failed to delete item. Server returned: ' + response.status);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error deleting item:', err);
+                        alert('Error deleting item: ' + err);
+                    });
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+            }
+        });
+
+        // Contra Toggle Listener
+        document.getElementById('enable_contra').addEventListener('change', function () {
+            document.getElementById('contra_fields').style.display = this.checked ? 'block' : 'none';
+        });
+
+        // Adjustment Logic
+        const editValInput = document.getElementById('edit_value');
+        const editAdjInput = document.getElementById('edit_adjustment');
+        const editOldValInput = document.getElementById('edit_old_value');
+
+        editAdjInput.addEventListener('input', function () {
+            const oldVal = parseFloat(editOldValInput.value) || 0;
+            const adj = parseFloat(this.value) || 0;
+            editValInput.value = (oldVal + adj).toFixed(2);
+        });
+
+
+        editValInput.addEventListener('input', function () {
+            const oldVal = parseFloat(editOldValInput.value) || 0;
+            const newVal = parseFloat(this.value);
+            if (!isNaN(newVal)) {
+                editAdjInput.value = (newVal - oldVal).toFixed(2);
+            }
+        });
+
+        // BF Change Listener
+        editOldValInput.addEventListener('input', function () {
+            const oldVal = parseFloat(this.value) || 0;
+            const adj = parseFloat(editAdjInput.value) || 0;
+            editValInput.value = (oldVal + adj).toFixed(2);
+        });
+    });
+</script>
+
+<script>
+    // Global Delete Function - moved outside DOMContentLoaded for reliability
+    window.deleteItem = function (id, name) {
+        if (confirm('Delete ' + name + '?')) {
+            fetch('/balance_sheet/delete/' + id, { method: 'POST' })
+                .then(response => {
+                    if (response.ok || response.redirected) {
+                        window.location.reload();
+                    } else {
+                        if (response.status === 200) {
+                            window.location.reload();
+                        } else {
+                            alert('Failed to delete item. Server returned: ' + response.status);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error deleting item:', err);
+                    alert('Error deleting item: ' + err);
+                });
+        }
+    };
+
+    // Event delegation for delete buttons - attach on DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('click', function (e) {
+            if (e.target.closest('.delete-item-btn')) {
+                const btn = e.target.closest('.delete-item-btn');
+                const itemId = btn.getAttribute('data-item-id');
+                const itemName = btn.getAttribute('data-item-name');
+                if (itemId && itemName) {
+                    window.deleteItem(itemId, itemName);
+                }
+            }
+        });
+    });
+</script>
+
+<script>
+    function openAddModal(cls, type, tier) {
+        // Open Modal
+        var myModal = new bootstrap.Modal(document.getElementById('addItemModal'));
+        myModal.show();
+
+        // Set Values
+        // Wait for modal to be potentially ready, or just set immediately
+        setTimeout(() => {
+            const classSelect = document.getElementById('add_class');
+            const typeSelect = document.getElementById('add_type');
+            const tierSelect = document.getElementById('add_tier');
+
+            if (classSelect) classSelect.value = cls;
+            if (typeSelect) typeSelect.value = type;
+            if (tierSelect) tierSelect.value = tier ? tier : ""; // Set to empty if null
+
+            // Trigger generic change event if needed for any dependent logic
+            if (classSelect) classSelect.dispatchEvent(new Event('change'));
+        }, 200);
+    }
+</script>
+
+
+<!-- Import Modal -->
+<div class="modal fade" id="importBalanceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import Balance Sheet from Excel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('import_balance_sheet') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <p>Upload an Excel file (.xlsx) with your balance sheet items.</p>
+                    <div class="alert alert-info">
+                        <strong>Format:</strong> Classification | Name | Value | Type | Liquidity Tier | Obligation
+                        Type<br>
+                        <small>Classification: Current Asset/Non-Current Asset/Current Liability/Non-Current Liability.
+                            Duplicates will be skipped.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Excel File</label>
+                        <input type="file" class="form-control" name="file" accept=".xlsx" required>
+                    </div>
+                    <a href="{{ url_for('download_balance_sheet_template') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-download"></i> Download Template
+                    </a>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+
+
+<script>
+    // Offline Form Handling for Balance Sheet
+    const balanceItemForm = document.getElementById('balanceItemForm');
+    if (balanceItemForm) {
+        balanceItemForm.addEventListener('submit', async function (e) {
+            // Check if we're offline
+            if (!navigator.onLine) {
+                e.preventDefault(); // Prevent normal form submission
+
+                // Get form data
+                const formData = {
+                    classification: document.querySelector('#balanceItemForm select[name="classification"]').value,
+                    name: document.querySelector('#balanceItemForm input[name="name"]').value,
+                    value: document.querySelector('#balanceItemForm input[name="value"]').value,
+                    asset_type: document.querySelector('#balanceItemForm select[name="asset_type"]').value,
+                    liquidity_tier: document.querySelector('#balanceItemForm select[name="liquidity_tier"]').value,
+                    contact_email: document.querySelector('#balanceItemForm input[name="contact_email"]')?.value || '',
+                    contact_phone: document.querySelector('#balanceItemForm input[name="contact_phone"]')?.value || ''
+                };
+
+                try {
+                    // Save to IndexedDB
+                    await offlineDB.addBalanceItem(formData);
+
+                    // Show success message
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-warning alert-dismissible fade show position-fixed';
+                    alert.style.cssText = 'top: 80px; right: 20px; z-index: 9999; min-width: 300px;';
+                    alert.innerHTML = `
+                        <strong>⚠️ Offline Mode:</strong> Balance item saved locally. Will sync when online.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.body.appendChild(alert);
+
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addManualItemModal'));
+                    if (modal) modal.hide();
+
+                    // Reset form
+                    balanceItemForm.reset();
+
+                    // Update sync status
+                    await syncManager.updateStatus();
+
+                    // Auto-remove alert after 5 seconds
+                    setTimeout(() => alert.remove(), 5000);
+                } catch (error) {
+                    console.error('Failed to save offline:', error);
+                    alert('Failed to save balance item offline. Please try again.');
+                }
+            }
+            // If online, let the form submit normally
+        });
+    }
+</script>
+
+
+
+{% endblock %}

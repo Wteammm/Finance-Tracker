@@ -1,0 +1,752 @@
+{% extends 'base.html' %}
+
+{% block dashboard %}daily-transaction{% endblock %}
+{% block dashboard_title %}Daily Transaction{% endblock %}
+
+{% block top_nav %}
+<a href="{{ url_for('chart') }}" class="{% if request.endpoint == 'chart' %}active{% endif %}">Transaction Overview</a>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-header">Total Balance</div>
+            <div class="card-body">
+                <h3 class="card-title">RM {{ total_balance|comma }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header bg-white">Add Transaction</div>
+            <div class="card-body">
+                <form method="POST" id="transactionForm">
+                    <div class="mb-2">
+                        <label for="date" class="form-label visually-hidden">Date</label>
+                        <input type="date" class="form-control form-control-sm" id="date" name="date" required
+                            aria-label="Transaction date">
+                    </div>
+                    <div class="mb-2">
+                        <label for="category" class="form-label visually-hidden">Category</label>
+                        <div class="input-group input-group-sm">
+                            <select class="form-select form-select-sm" id="category" name="category" required>
+                                <option value="">选择类别 (Select Category)</option>
+                                <optgroup label="收入 (Income)">
+                                    {% for cat in income_categories %}
+                                    <option value="{{ cat.name }}">{{ cat.name }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                <optgroup label="支出 (Expense)">
+                                    {% for cat in expense_categories %}
+                                    <option value="{{ cat.name }}">{{ cat.name }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal"
+                                data-bs-target="#manageCategoriesModal" title="Manage Categories">
+                                <i class="bi bi-gear"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label for="description" class="form-label visually-hidden">Description</label>
+                        <input type="text" class="form-control form-control-sm" id="description" name="description"
+                            placeholder="Description">
+                    </div>
+                    <div class="mb-2">
+                        <label for="account_id" class="form-label visually-hidden">Account</label>
+                        <select class="form-select form-select-sm" id="account_id" name="account_id">
+                            <option value="" selected>General / Unallocated</option>
+                            {% for account in accounts %}
+                            <option value="{{ account.id }}">{{ account.name }} (RM {{ account.current_balance|comma }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Optional: Link to Source Account (e.g. MBB, Cash)</div>
+                    </div>
+                    <div class="mb-2">
+                        <label for="amount" class="form-label visually-hidden">Amount</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm" id="amount" name="amount"
+                            placeholder="Amount" required>
+                        <div class="form-text">Negative for expenses, positive for income.</div>
+                    </div>
+                    <!-- ARIA Live Region for Form Errors -->
+                    <div id="form-errors" class="alert alert-danger d-none" role="alert" aria-live="polite"
+                        aria-atomic="true">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="error-message"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Add</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Filter Transactions</h5>
+                <div>
+                    <button class="btn btn-sm" data-bs-toggle="modal" data-bs-target="#importModal"
+                        style="background: linear-gradient(135deg, #c9a66b 0%, #a67c52 100%); color: white; font-weight: 700; border: none; box-shadow: 0 3px 10px rgba(166, 124, 82, 0.3); margin-right: 5px;">
+                        <i class="bi bi-upload"></i> Import
+                    </button>
+                    <a href="{{ url_for('export_transactions') }}" class="btn btn-sm"
+                        style="background: linear-gradient(135deg, #c9a66b 0%, #a67c52 100%); color: white !important; font-weight:700; border: none; box-shadow: 0 3px 10px rgba(166, 124, 82, 0.3);">
+                        <i class="bi bi-file-earmark-excel"></i> Export
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('index') }}">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <select class="form-select" name="month">
+                                <option value="">All Months</option>
+                                {% for m in range(1, 13) %}
+                                <option value="{{ m }}" {% if current_month==m %}selected{% endif %}>{{ m }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <select class="form-select" name="year">
+                                <option value="">All Years</option>
+                                {% for y in years %}
+                                <option value="{{ y }}" {% if current_year==y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-secondary w-100">Filter</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <!-- Recurring Items Due Widget -->
+        {% if pending_recurring %}
+        <div class="card mb-3 border-primary">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-calendar-check me-2"></i>Recurring Items Due ({{
+                    current_date.strftime('%b') }})</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    {% for item in pending_recurring %}
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center border rounded p-2 bg-light">
+                            <div>
+                                <div class="fw-bold">{{ item.name }}</div>
+                                <small class="{{ 'text-success' if item.type == 'Income' else 'text-danger' }}">
+                                    {{ '+' if item.type == 'Income' else '-' }}RM {{ item.amount|comma }}
+                                </small>
+                            </div>
+                            <form action="{{ url_for('post_recurring', id=item.id) }}" method="POST" class="m-0">
+                                <button type="submit" class="btn btn-sm btn-success" title="Post to Ledger">
+                                    <i class="bi bi-check-lg"></i> Post
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Recent Transactions</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <caption class="visually-hidden">List of recent financial transactions</caption>
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Category</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in transactions %}
+                        <tr>
+                            <td>{{ transaction.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ transaction.category }}</td>
+                            <td>{{ transaction.description }}</td>
+                            <td class="{{ 'text-success' if transaction.amount > 0 else 'text-danger' }}">
+                                {{ transaction.amount|comma }}
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal"
+                                    data-bs-target="#editModal" data-id="{{ transaction.id }}"
+                                    data-date="{{ transaction.date.strftime('%Y-%m-%d') }}"
+                                    data-category="{{ transaction.category }}"
+                                    data-description="{{ transaction.description }}"
+                                    data-amount="{{ transaction.amount }}"
+                                    data-account-id="{{ transaction.account_id if transaction.account_id else '' }}">
+                                    Edit
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger"
+                                    onclick="deleteTransaction({{ transaction.id }})">Delete</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Transaction Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editModalLabel">Edit Transaction</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm" method="POST">
+                    <div class="mb-3">
+                        <label for="edit_date" class="form-label">Date</label>
+                        <input type="date" class="form-control" id="edit_date" name="date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_category" class="form-label">Category</label>
+                        <select class="form-select" id="edit_category" name="category" required>
+                            <optgroup label="收入 (Income)">
+                                <option value="工资">工资 (Salary)</option>
+                                <option value="奖金">奖金 (Bonus)</option>
+                                <option value="投资">投资 (Investment)</option>
+                                <option value="存钱">存钱 (Savings)</option>
+                                <option value="退款">退款 (Refund)</option>
+                            </optgroup>
+                            <optgroup label="支出 (Expense)">
+                                <option value="PTPTN">PTPTN</option>
+                                <option value="保险">保险 (Insurance)</option>
+                                <option value="水电费">水电费 (Utilities)</option>
+                                <option value="电话费">电话费 (Phone)</option>
+                                <option value="打油">打油 (Petrol)</option>
+                                <option value="公交">公交 (Public Transport)</option>
+                                <option value="Toll">Toll</option>
+                                <option value="泊车">泊车 (Parking)</option>
+                                <option value="餐饮">餐饮 (Dining)</option>
+                                <option value="零食">零食 (Snacks)</option>
+                                <option value="面包">面包 (Bread)</option>
+                                <option value="水果">水果 (Fruit)</option>
+                                <option value="蔬菜">蔬菜 (Vegetables)</option>
+                                <option value="奶茶/饮料">奶茶/饮料 (Drinks)</option>
+                                <option value="炸物">炸物 (Fried Food)</option>
+                                <option value="汉堡包">汉堡包 (Burger)</option>
+                                <option value="请别人吃">请别人吃 (Treat Others)</option>
+                                <option value="服装">服装 (Clothing)</option>
+                                <option value="鞋子">鞋子 (Shoes)</option>
+                                <option value="护肤品">护肤品 (Skincare)</option>
+                                <option value="护发">护发 (Haircare)</option>
+                                <option value="美容">美容 (Beauty)</option>
+                                <option value="梳洗卫生">梳洗卫生 (Toiletries)</option>
+                                <option value="首饰">首饰 (Jewelry)</option>
+                                <option value="香水">香水 (Perfume)</option>
+                                <option value="图书">图书 (Books)</option>
+                                <option value="教育">教育 (Education)</option>
+                                <option value="办公">办公 (Office)</option>
+                                <option value="家具">家具 (Furniture)</option>
+                                <option value="家电">家电 (Appliances)</option>
+                                <option value="购物">购物 (Shopping)</option>
+                                <option value="购物（食物）">购物（食物） (Groceries)</option>
+                                <option value="宠物">宠物 (Pets)</option>
+                                <option value="家人红包">家人红包 (Family Angpao)</option>
+                                <option value="婴幼儿">婴幼儿 (Baby)</option>
+                                <option value="保健">保健 (Supplements)</option>
+                                <option value="健康">健康 (Health)</option>
+                                <option value="牙齿保护">牙齿保护 (Dental)</option>
+                                <option value="牙医">牙医 (Dentist)</option>
+                                <option value="娱乐">娱乐 (Entertainment)</option>
+                                <option value="请别人的娱乐">请别人的娱乐 (Treat Ent.)</option>
+                                <option value="唱K">唱K (Karaoke)</option>
+                                <option value="运动">运动 (Sports)</option>
+                                <option value="旅行">旅行 (Travel)</option>
+                                <option value="彩票">彩票 (Lottery)</option>
+                                <option value="数码">数码 (Digital)</option>
+                                <option value="礼物">礼物 (Gifts)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_description" class="form-label">Description</label>
+                        <input type="text" class="form-control" id="edit_description" name="description">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_account_id" class="form-label">Account</label>
+                        <select class="form-select" id="edit_account_id" name="account_id">
+                            <option value="">General / Unallocated</option>
+                            {% for account in accounts %}
+                            <option value="{{ account.id }}">{{ account.name }} (RM {{ account.current_balance|comma }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_amount" class="form-label">Amount</label>
+                        <input type="number" step="0.01" class="form-control" id="edit_amount" name="amount" required>
+                        <div class="form-text">Negative for expenses, positive for income.</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this transaction?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Auto-negate Logic for Expense Categories
+        function attachAutoNegate(form) {
+            const categorySelect = form.querySelector('select[name="category"]');
+            const amountInput = form.querySelector('input[name="amount"]');
+
+            if (!categorySelect || !amountInput) return;
+
+            const handleSign = () => {
+                const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+                if (!selectedOption) return;
+                const optGroup = selectedOption.parentElement;
+                let val = parseFloat(amountInput.value);
+                if (isNaN(val)) return;
+
+                if (optGroup && (optGroup.label.includes('支出') || optGroup.label.includes('Expense'))) {
+                    if (val > 0) amountInput.value = -val;
+                } else if (optGroup && (optGroup.label.includes('收入') || optGroup.label.includes('Income'))) {
+                    if (val < 0) amountInput.value = Math.abs(val);
+                }
+            };
+
+            categorySelect.addEventListener('change', handleSign);
+            amountInput.addEventListener('change', handleSign);
+        }
+
+        // Apply to Add Form (first form in Add Transaction card)
+        const addForm = document.querySelector('.card-body form');
+        if (addForm) attachAutoNegate(addForm);
+
+        // Apply to Edit Form
+        const editForm = document.getElementById('editForm');
+        if (editForm) attachAutoNegate(editForm);
+
+        // Set default date for Add Transaction form
+        document.getElementById('date').valueAsDate = new Date();
+
+        // Handle Edit Modal Data Population
+        var editModal = document.getElementById('editModal');
+        editModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var id = button.getAttribute('data-id');
+            var date = button.getAttribute('data-date');
+            var category = button.getAttribute('data-category');
+            var description = button.getAttribute('data-description');
+            var amount = button.getAttribute('data-amount');
+
+            var form = editModal.querySelector('#editForm');
+            var dateInput = editModal.querySelector('#edit_date');
+            var categoryInput = editModal.querySelector('#edit_category');
+            var descriptionInput = editModal.querySelector('#edit_description');
+            var amountInput = editModal.querySelector('#edit_amount');
+            var accountInput = editModal.querySelector('#edit_account_id');
+            var accountId = button.getAttribute('data-account-id');
+
+            form.action = '/edit/' + id;
+            dateInput.value = date;
+            categoryInput.value = category;
+            descriptionInput.value = description;
+            amountInput.value = amount;
+            accountInput.value = accountId;
+        });
+
+        // Delete Modal Logic
+        let deleteId = null;
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+        window.deleteTransaction = function (id) {
+            deleteId = id;
+            deleteModal.show();
+        };
+
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
+            if (deleteId) {
+                fetch('/delete/' + deleteId, {
+                    method: 'POST'
+                }).then(response => {
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Failed to delete transaction');
+                    }
+                }).catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting transaction');
+                });
+            }
+        });
+    });
+</script>
+
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import Transactions from Excel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('import_transactions') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <p>Upload an Excel file (.xlsx) with your transaction data.</p>
+                    <div class="alert alert-info">
+                        <strong>Format:</strong> Date | Description | Category | Amount<br>
+                        <small>Negative amounts for expenses, positive for income. Duplicates will be skipped.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Excel File</label>
+                        <input type="file" class="form-control" name="file" accept=".xlsx" required>
+                    </div>
+                    <a href="{{ url_for('download_transaction_template') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-download"></i> Download Template
+                    </a>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% block extra_js %}
+<script>
+    // Accessible Form Validation
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.querySelector('form[method="POST"]');
+        const errorContainer = document.getElementById('form-errors');
+        const errorMessage = document.getElementById('error-message');
+
+        if (form && errorContainer) {
+            form.addEventListener('submit', function (e) {
+                // Clear previous errors
+                errorContainer.classList.add('d-none');
+                errorMessage.textContent = '';
+
+                // Get form values
+                const date = document.getElementById('date').value;
+                const category = document.getElementById('category').value;
+                const amount = document.getElementById('amount').value;
+
+                // Validation
+                let errors = [];
+
+                if (!date) {
+                    errors.push('Date is required');
+                }
+
+                if (!category) {
+                    errors.push('Category is required');
+                }
+
+                if (!amount) {
+                    errors.push('Amount is required');
+                } else if (amount === '0' || amount === '0.00') {
+                    errors.push('Amount cannot be zero');
+                }
+
+                // Display errors if any
+                if (errors.length > 0) {
+                    e.preventDefault();
+                    errorMessage.textContent = errors.join('. ');
+                    errorContainer.classList.remove('d-none');
+                    errorContainer.focus(); // Move focus to error for screen readers
+                }
+            });
+        }
+    });
+
+    // Offline Form Handling
+    const transactionForm = document.getElementById('transactionForm');
+    if (transactionForm) {
+        transactionForm.addEventListener('submit', async function (e) {
+            // Check if we're offline
+            if (!navigator.onLine) {
+                e.preventDefault(); // Prevent normal form submission
+
+                // Get form data
+                const formData = {
+                    date: document.getElementById('date').value,
+                    category: document.getElementById('category').value,
+                    description: document.getElementById('description').value,
+                    amount: document.getElementById('amount').value,
+                    account_id: document.getElementById('account_id').value
+                };
+
+                try {
+                    // Save to IndexedDB
+                    await offlineDB.addTransaction(formData);
+
+                    // Show success message
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-warning alert-dismissible fade show';
+                    alert.innerHTML = `
+                        <strong>⚠️ Offline Mode:</strong> Transaction saved locally. Will sync when online.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    transactionForm.insertAdjacentElement('beforebegin', alert);
+
+                    // Reset form
+                    transactionForm.reset();
+                    document.getElementById('date').valueAsDate = new Date();
+
+                    // Update sync status
+                    await syncManager.updateStatus();
+
+                    // Auto-remove alert after 5 seconds
+                    setTimeout(() => alert.remove(), 5000);
+                } catch (error) {
+                    console.error('Failed to save offline:', error);
+                    alert('Failed to save transaction offline. Please try again.');
+                }
+            }
+            // If online, let the form submit normally
+        });
+    }
+</script>
+
+<!-- Category Management Modal -->
+<div class="modal fade" id="manageCategoriesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-gear"></i> Manage Categories</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Tabs -->
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="income-tab" data-bs-toggle="tab"
+                            data-bs-target="#income-categories" type="button">
+                            收入 (Income)
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="expense-tab" data-bs-toggle="tab"
+                            data-bs-target="#expense-categories" type="button">
+                            支出 (Expense)
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Income Tab -->
+                    <div class="tab-pane fade show active" id="income-categories">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Add New Income Category</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="newIncomeCategory"
+                                    placeholder="Enter category name">
+                                <button class="btn btn-success" onclick="addCategory('Income')">
+                                    <i class="bi bi-plus-circle"></i> Add
+                                </button>
+                            </div>
+                        </div>
+                        <hr>
+                        <label class="form-label fw-bold">Current Income Categories</label>
+                        <div id="incomeCategoryList" class="list-group"></div>
+                    </div>
+
+                    <!-- Expense Tab -->
+                    <div class="tab-pane fade" id="expense-categories">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Add New Expense Category</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="newExpenseCategory"
+                                    placeholder="Enter category name">
+                                <button class="btn btn-success" onclick="addCategory('Expense')">
+                                    <i class="bi bi-plus-circle"></i> Add
+                                </button>
+                            </div>
+                        </div>
+                        <hr>
+                        <label class="form-label fw-bold">Current Expense Categories</label>
+                        <div id="expenseCategoryList" class="list-group"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Category Management Functions
+    let currentCategories = { income: [], expense: [] };
+
+    // Load categories when modal opens
+    document.getElementById('manageCategoriesModal').addEventListener('show.bs.modal', loadCategories);
+
+    async function loadCategories() {
+        try {
+            const response = await fetch('/api/categories');
+            const data = await response.json();
+            currentCategories.income = data.income;
+            currentCategories.expense = data.expense;
+            renderCategoryLists();
+        } catch (error) {
+            console.error('Failed to load categories:', error);
+        }
+    }
+
+    function renderCategoryLists() {
+        // Render income categories
+        const incomeList = document.getElementById('incomeCategoryList');
+        incomeList.innerHTML = currentCategories.income.map(cat => `
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>${cat.name} ${cat.is_custom ? '<span class="badge bg-info">Custom</span>' : ''}</span>
+                <button class="btn btn-sm btn-danger" onclick="deleteCategory(${cat.id}, 'Income')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `).join('');
+
+        // Render expense categories
+        const expenseList = document.getElementById('expenseCategoryList');
+        expenseList.innerHTML = currentCategories.expense.map(cat => `
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>${cat.name} ${cat.is_custom ? '<span class="badge bg-info">Custom</span>' : ''}</span>
+                <button class="btn btn-sm btn-danger" onclick="deleteCategory(${cat.id}, 'Expense')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    async function addCategory(type) {
+        const inputId = type === 'Income' ? 'newIncomeCategory' : 'newExpenseCategory';
+        const input = document.getElementById(inputId);
+        const name = input.value.trim();
+
+        if (!name) {
+            alert('Please enter a category name');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/categories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, type })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                input.value = '';
+                await loadCategories();
+                updateCategoryDropdown();
+                showToast(data.restored ? 'Category restored!' : 'Category added!', 'success');
+            } else {
+                alert(data.error || 'Failed to add category');
+            }
+        } catch (error) {
+            console.error('Failed to add category:', error);
+            alert('Failed to add category');
+        }
+    }
+
+    async function deleteCategory(categoryId, type) {
+        if (!confirm('Are you sure you want to remove this category?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/categories/${categoryId}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                await loadCategories();
+                updateCategoryDropdown();
+                showToast('Category removed!', 'success');
+            } else {
+                alert(data.error || 'Failed to delete category');
+            }
+        } catch (error) {
+            console.error('Failed to delete category:', error);
+            alert('Failed to delete category');
+        }
+    }
+
+    function updateCategoryDropdown() {
+        const categorySelect = document.getElementById('category');
+        const currentValue = categorySelect.value;
+
+        // Rebuild dropdown
+        categorySelect.innerHTML = `
+            <option value="">选择类别 (Select Category)</option>
+            <optgroup label="收入 (Income)">
+                ${currentCategories.income.map(cat => `<option value="${cat.name}">${cat.name}</option>`).join('')}
+            </optgroup>
+            <optgroup label="支出 (Expense)">
+                ${currentCategories.expense.map(cat => `<option value="${cat.name}">${cat.name}</option>`).join('')}
+            </optgroup>
+        `;
+
+        // Restore selected value if still exists
+        if (currentValue) {
+            categorySelect.value = currentValue;
+        }
+    }
+
+    function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        toast.style.cssText = 'top: 80px; right: 20px; z-index: 9999; min-width: 250px;';
+        toast.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+</script>
+
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block dashboard_title %}Verify Identity{% endblock %}
+
+{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Identity - Finance Tracker</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e5a2d 0%, #2d7a3e 50%, #1e5a2d 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .verify-container {
+            background: rgba(255, 255, 255, 0.98);
+            border: 2px solid #2d7a3e;
+            border-radius: 20px;
+            padding: 3rem 2.5rem;
+            box-shadow: 0 20px 60px rgba(45, 122, 62, 0.4);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .verify-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .verify-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: linear-gradient(135deg, #2d7a3e 0%, #52b788 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(45, 122, 62, 0.4);
+        }
+
+        .verify-icon i {
+            font-size: 2.5rem;
+            color: #ffffff;
+        }
+
+        .verify-header h1 {
+            background: linear-gradient(135deg, #2d7a3e 0%, #52b788 50%, #2d7a3e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .verify-header p {
+            color: #6c757d;
+            font-size: 0.95rem;
+        }
+
+        .form-label {
+            color: #2d7a3e;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .form-control {
+            background: #ffffff;
+            border: 2px solid rgba(45, 122, 62, 0.3);
+            color: #1a1a1a;
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus {
+            background: #ffffff;
+            border-color: #2d7a3e;
+            box-shadow: 0 0 20px rgba(45, 122, 62, 0.2);
+            color: #1a1a1a;
+        }
+
+        .btn-verify {
+            background: linear-gradient(135deg, #2d7a3e 0%, #52b788 100%);
+            color: #ffffff;
+            font-weight: 700;
+            padding: 0.875rem;
+            border-radius: 10px;
+            border: none;
+            width: 100%;
+            font-size: 1.1rem;
+            margin-top: 1rem;
+            box-shadow: 0 8px 20px rgba(45, 122, 62, 0.4);
+            transition: all 0.3s;
+        }
+
+        .btn-verify:hover {
+            background: linear-gradient(135deg, #26652f 0%, #40916c 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(45, 122, 62, 0.5);
+        }
+
+        .alert {
+            border-radius: 10px;
+            border: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .alert-danger {
+            background: rgba(220, 53, 69, 0.15);
+            color: #dc3545;
+            border-left: 4px solid #dc3545;
+        }
+
+        .question-box {
+            background: rgba(45, 122, 62, 0.05);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid #2d7a3e;
+        }
+
+        .btn-outline-secondary {
+            border-color: #2d7a3e !important;
+            color: #2d7a3e !important;
+        }
+
+        .btn-outline-secondary:hover {
+            background-color: #2d7a3e !important;
+            color: #ffffff !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="verify-container">
+        <div class="verify-header">
+            <div class="verify-icon">
+                <i class="bi bi-shield-lock-fill"></i>
+            </div>
+            <h1>Verify Identity</h1>
+            <p>Answer your security questions</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <div class="question-box">
+                <label class="form-label">
+                    <i class="bi bi-1-circle-fill"></i> {{ question1 }}
+                </label>
+                <input type="text" class="form-control" name="answer1" required autofocus>
+            </div>
+
+            <div class="question-box">
+                <label class="form-label">
+                    <i class="bi bi-2-circle-fill"></i> {{ question2 }}
+                </label>
+                <input type="text" class="form-control" name="answer2" required>
+            </div>
+
+            <div class="question-box">
+                <label class="form-label">
+                    <i class="bi bi-3-circle-fill"></i> {{ question3 }}
+                </label>
+                <input type="text" class="form-control" name="answer3" required>
+            </div>
+
+            <button type="submit" class="btn btn-verify">
+                <i class="bi bi-check-circle-fill"></i> Verify Answers
+            </button>
+        </form>
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Back to Login
+            </a>
+        </div>
+    </div>
+</body>
+
+</html>
+{% endblock %}

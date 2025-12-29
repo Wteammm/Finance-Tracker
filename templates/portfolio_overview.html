@@ -1,0 +1,391 @@
+{% extends 'base.html' %}
+
+{% block dashboard %}investment{% endblock %}
+{% block dashboard_title %}Portfolio Overview{% endblock %}
+
+{% block top_nav %}
+<a href="{{ url_for('forex') }}" class="{% if request.endpoint == 'forex' %}active{% endif %}">Forex Manager</a>
+<a href="{{ url_for('add_investment') }}" class="{% if request.endpoint == 'add_investment' %}active{% endif %}">Add Investment</a>
+<a href="{{ url_for('portfolio_overview') }}" class="active">Portfolio Overview</a>
+{% endblock %}
+
+
+
+{% block content %}
+<style>
+    .info-tooltip {
+        cursor: help;
+        color: #6c757d;
+        font-size: 0.9em;
+        position: relative;
+        display: inline-block;
+    }
+
+    .info-tooltip:hover::after {
+        content: attr(title);
+        position: absolute;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #333;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        white-space: nowrap;
+        z-index: 1000;
+        font-size: 12px;
+    }
+
+    .info-tooltip:hover::before {
+        content: '';
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 5px solid transparent;
+        border-top-color: #333;
+        z-index: 1000;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Investment Overview</h2>
+    <a href="{{ url_for('portfolio') }}" class="btn btn-secondary">Back to Portfolio</a>
+</div>
+
+<!-- Filter Buttons -->
+<div class="btn-group mb-4" role="group">
+    <a href="{{ url_for('portfolio_overview', filter='overall') }}"
+        class="btn {{ 'btn-primary' if filter_type == 'overall' else 'btn-outline-primary' }}">
+        Overall Performance
+    </a>
+    <a href="{{ url_for('portfolio_overview', filter='holdings') }}"
+        class="btn {{ 'btn-primary' if filter_type == 'holdings' else 'btn-outline-primary' }}">
+        Current Holdings ({{ holdings_count }})
+    </a>
+    <a href="{{ url_for('portfolio_overview', filter='sold') }}"
+        class="btn {{ 'btn-primary' if filter_type == 'sold' else 'btn-outline-primary' }}">
+        Sold Positions ({{ sold_count }})
+    </a>
+</div>
+
+<!-- Currency Selector -->
+<div class="mb-4">
+    <label for="currencySelect" class="form-label me-2">Display Currency:</label>
+    <select id="currencySelect" class="form-select d-inline-block w-auto" onchange="changeCurrency(this.value)">
+        <option value="MYR" {{ 'selected' if view_currency=='MYR' else '' }}>MYR (Converted)</option>
+        <option value="USD" {{ 'selected' if view_currency=='USD' else '' }}>USD (Converted)</option>
+        <option value="Original" {{ 'selected' if view_currency=='Original' else '' }}>Original Currency</option>
+    </select>
+</div>
+
+{% if view_currency == 'MYR' %}
+<div class="alert alert-light border small py-1 px-2 mb-4 d-inline-block">
+    <strong>Exchange Rates used:</strong>
+    Cost Basis @ Avg Rate ({{ "%.4f"|format(avg_forex_rate) }}) |
+    Market Value @ Current Rate ({{ "%.4f"|format(current_forex_rate) }})
+</div>
+{% endif %}
+
+<script>
+    function changeCurrency(currency) {
+        const url = new URL(window.location);
+        url.searchParams.set('currency', currency);
+        window.location.href = url.toString();
+    }
+</script>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h6 class="card-title">
+                    {% if filter_type == 'holdings' %}Current Value{% else %}Total Portfolio Value{% endif %}
+                </h6>
+                <h3 class="mb-0">{{ display_currency }} {{ total_market_value|comma }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h6 class="card-title">Total Invested</h6>
+                <h3 class="mb-0">{{ display_currency }} {{ total_invested|comma }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white {{ 'bg-success' if total_pnl >= 0 else 'bg-danger' }}">
+            <div class="card-body">
+                <h6 class="card-title">Total P&L</h6>
+                <h3 class="mb-0">{{ display_currency }} {{ total_pnl|comma }} <small>({{
+                        total_pnl_percent|comma
+                        }}%)</small></h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h6 class="card-title">Total Dividends</h6>
+                <h3 class="mb-0">{{ display_currency }} {{ total_dividends|comma }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Additional Metrics Row (for Overall view) -->
+{% if filter_type == 'overall' %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted">
+                    Realized P&L
+                    <span class="info-tooltip" title="From sold positions">ⓘ</span>
+                </h6>
+                <h4 class="{{ 'text-success' if total_realized_pnl >= 0 else 'text-danger' }}">
+                    {{ display_currency }} {{ total_realized_pnl|comma }}
+                </h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted">
+                    Unrealized P&L
+                    <span class="info-tooltip" title="From current holdings">ⓘ</span>
+                </h6>
+                <h4 class="{{ 'text-success' if (total_pnl - total_realized_pnl) >= 0 else 'text-danger' }}">
+                    {{ display_currency }} {{ (total_pnl - total_realized_pnl)|comma }}
+                </h4>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Charts Row (only for holdings view) -->
+{% if filter_type == 'holdings' and market_allocation %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Market Allocation</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="marketAllocationChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Currency Allocation</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="currencyAllocationChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Detailed Items Table -->
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">
+            {% if filter_type == 'holdings' %}
+            Current Holdings Details
+            {% elif filter_type == 'sold' %}
+            Sold Positions Details
+            {% else %}
+            All Positions Details
+            {% endif %}
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Market</th>
+                        {% if filter_type == 'overall' %}
+                        <th>Status</th>
+                        {% endif %}
+                        <th>Qty Bought</th>
+                        <th>Qty Sold</th>
+                        <th>Current Qty</th>
+                        <th>Avg Buy Price</th>
+                        {% if filter_type != 'holdings' %}
+                        <th>Avg Sell Price</th>
+                        {% endif %}
+                        <th>Total Cost</th>
+                        {% if filter_type != 'sold' %}
+                        <th>Current Value</th>
+                        {% endif %}
+                        <th>Dividends</th>
+                        <th>P&L (MYR)</th>
+                        <th>P&L (%)</th>
+                        <th>Buy Date</th>
+                        {% if filter_type != 'holdings' %}
+                        <th>Sell Date</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in detailed_items %}
+                    <tr>
+                        <td><strong>{{ item.symbol }}</strong></td>
+                        <td><span class="badge bg-secondary">{{ item.market }}</span></td>
+                        {% if filter_type == 'overall' %}
+                        <td>
+                            <span class="badge {{ 'bg-success' if item.status == 'Holding' else 'bg-secondary' }}">
+                                {{ item.status }}
+                            </span>
+                        </td>
+                        {% endif %}
+                        <td>{{ item.total_bought|comma }}</td>
+                        <td>{{ item.total_sold|comma }}</td>
+                        <td>{{ item.quantity|comma }}</td>
+                        <td>{{ item.currency }} {{ item.avg_buy_price|comma }}</td>
+                        {% if filter_type != 'holdings' %}
+                        <td>
+                            {% if item.avg_sell_price > 0 %}
+                            {{ item.currency }} {{ item.avg_sell_price|comma }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                        <td>{{ item.currency }} {{ item.cost|comma }}</td>
+                        {% if filter_type != 'sold' %}
+                        <td>{{ item.currency }} {{ item.value|comma }}</td>
+                        {% endif %}
+                        <td>{{ item.currency }} {{ item.dividends|comma }}</td>
+                        <td class="{{ 'text-success' if item.pnl_value >= 0 else 'text-danger' }}">
+                            {{ item.pnl_value|comma }}
+                        </td>
+                        <td class="{{ 'text-success' if item.pnl_percent >= 0 else 'text-danger' }}">
+                            {{ item.pnl_percent|comma }}%
+                        </td>
+                        <td>
+                            {% if item.first_buy_date %}
+                            {{ item.first_buy_date.strftime('%Y-%m-%d') }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        {% if filter_type != 'holdings' %}
+                        <td>
+                            {% if item.last_sell_date %}
+                            {{ item.last_sell_date.strftime('%Y-%m-%d') }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js (only load if needed) -->
+{% if filter_type == 'holdings' and market_allocation %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+    // Market Allocation Chart
+    const marketData = {{ market_allocation| tojson | safe }};
+    const marketLabels = Object.keys(marketData);
+    const marketValues = Object.values(marketData);
+
+    const marketColors = {
+        'US': '#0d6efd',
+        'MY': '#198754',
+        'Crypto': '#ffc107',
+        'MMF-RM': '#6610f2',
+        'MMF-USD': '#d63384'
+    };
+
+    const marketBackgroundColors = marketLabels.map(label => marketColors[label] || '#6c757d');
+
+    new Chart(document.getElementById('marketAllocationChart'), {
+        type: 'pie',
+        data: {
+            labels: marketLabels,
+            datasets: [{
+                data: marketValues,
+                backgroundColor: marketBackgroundColors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(2);
+                            return `${label}: MYR ${value.toFixed(2)} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Currency Allocation Chart
+    const currencyData = {{ currency_allocation| tojson | safe }};
+    const currencyLabels = Object.keys(currencyData);
+    const currencyValues = Object.values(currencyData);
+
+    new Chart(document.getElementById('currencyAllocationChart'), {
+        type: 'doughnut',
+        data: {
+            labels: currencyLabels,
+            datasets: [{
+                data: currencyValues,
+                backgroundColor: ['#198754', '#0d6efd'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(2);
+                            return `${label}: MYR ${value.toFixed(2)} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

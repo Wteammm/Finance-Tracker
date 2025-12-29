@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Manage Forex</h2>
+    <a href="{{ url_for('portfolio') }}" class="btn btn-secondary">Back to Portfolio</a>
+</div>
+
+<!-- Summary Card -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-header">Average Forex Rate (MYR/USD)</div>
+            <div class="card-body">
+                <h3 class="card-title">{{ "%.4f"|format(avg_rate) }}</h3>
+                <p class="card-text">Used for all USD investments</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Forex Form -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Add Exchange Record</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="date" class="form-label">Date</label>
+                    <input type="date" class="form-control" id="date" name="date" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="amount_myr" class="form-label">Amount (MYR)</label>
+                    <input type="number" step="0.01" class="form-control" id="amount_myr" name="amount_myr"
+                        placeholder="e.g. 4500" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="rate" class="form-label">Exchange Rate</label>
+                    <input type="number" step="0.0001" class="form-control" id="rate" name="rate"
+                        placeholder="e.g. 4.50" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Record</button>
+        </form>
+    </div>
+</div>
+
+<!-- History Table -->
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Exchange History</h5>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Amount (MYR)</th>
+                    <th>Rate</th>
+                    <th>Amount (USD)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in forex_txs %}
+                <tr>
+                    <td>{{ tx.date.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ "%.2f"|format(tx.amount_myr) }}</td>
+                    <td>{{ "%.4f"|format(tx.rate) }}</td>
+                    <td>{{ "%.2f"|format(tx.amount_usd) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

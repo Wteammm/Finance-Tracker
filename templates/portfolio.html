@@ -1,0 +1,544 @@
+{% extends 'base.html' %}
+
+{% block dashboard %}investment{% endblock %}
+{% block dashboard_title %}Investment{% endblock %}
+
+{% block top_nav %}
+<a href="{{ url_for('forex') }}" class="{% if request.endpoint == 'forex' %}active{% endif %}">Forex Manager</a>
+<a href="{{ url_for('add_investment') }}" class="{% if request.endpoint == 'add_investment' %}active{% endif %}">Add
+    Investment</a>
+<a href="{{ url_for('portfolio_overview') }}"
+    class="{% if request.endpoint == 'portfolio_overview' %}active{% endif %}">Portfolio Overview</a>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12 text-end">
+        <button class="btn btn-sm" data-bs-toggle="modal" data-bs-target="#importPortfolioModal"
+            style="background: linear-gradient(135deg, #c9a66b 0%, #a67c52 100%); color: white; font-weight: 700; border: none; box-shadow: 0 3px 10px rgba(166, 124, 82, 0.3); margin-right: 5px;">
+            <i class="bi bi-upload"></i> Import
+        </button>
+        <a href="{{ url_for('portfolio_export') }}" class="btn btn-sm"
+            style="background: linear-gradient(135deg, #c9a66b 0%, #a67c52 100%); color: white !important; font-weight: 700; border: none; box-shadow: 0 3px 10px rgba(166, 124, 82, 0.3);">
+            <i class="bi bi-file-earmark-excel"></i> Export
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-header">Total Invested</div>
+            <div class="card-body">
+                <h3 class="card-title">{{ total_currency }} {{ total_invested|comma }}</h3>
+                <small>Using Avg Forex Rate: {{ "%.4f"|format(avg_forex_rate) }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header bg-white">View Settings</div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('portfolio') }}">
+                    <label for="currency" class="form-label">Display Currency</label>
+                    <select class="form-select mb-3" name="currency" onchange="this.form.submit()">
+                        <option value="MYR" {% if view_currency=='MYR' %}selected{% endif %}>MYR (Converted)</option>
+                        <option value="USD" {% if view_currency=='USD' %}selected{% endif %}>USD (Converted)</option>
+                        <option value="Original" {% if view_currency=='Original' %}selected{% endif %}>Original Currency
+                        </option>
+                    </select>
+
+                    <label for="custom_rate" class="form-label">Current USD/MYR Rate</label>
+                    <div class="input-group">
+                        <input type="number" step="0.0001" class="form-control" name="custom_rate"
+                            value="{{ '%.4f'|format(current_forex_rate) }}" placeholder="e.g. 4.50">
+                        <button class="btn btn-outline-secondary" type="submit">Update</button>
+                    </div>
+                    <small class="text-muted">Used for Market Value calculation</small>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Holdings Table -->
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Current Holdings</h5>
+        <small class="text-muted">Right-click on a row for actions</small>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="holdingsTable">
+                <caption class="visually-hidden">Current investment holdings with performance metrics</caption>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Brokerage</th>
+                        <th>Qty</th>
+                        <th>Avg Cost</th>
+                        <th>Cur. Price</th>
+                        <th>Value</th>
+                        <th>P&L ($)</th>
+                        <th>P&L (%)</th>
+                        <th>Ann. Ret.</th>
+                        <th>Yield (Cost)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for key, data in holdings.items() %}
+                    {% set symbol, brokerage = key %}
+                    <tr class="holding-row" data-symbol="{{ symbol }}" data-market="{{ data.market }}"
+                        data-currency="{{ data.currency }}" data-brokerage="{{ brokerage }}">
+                        <td>
+                            <strong>{{ symbol }}</strong>
+                            <br>
+                            <span class="badge bg-secondary">{{ data.market }}</span>
+                        </td>
+                        <td>
+                            {% if brokerage %}
+                            <span class="badge bg-info">{{ brokerage }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ data.quantity|comma }}</td>
+                        <td>
+                            {% if data.quantity > 0 %}
+                            {{ (data.display_cost / data.quantity)|comma }}
+                            {% else %}
+                            0.00
+                            {% endif %}
+                        </td>
+                        <td>{{ data.current_price|comma }}</td>
+                        <td>{{ data.display_market_value|comma }} {{ data.display_currency }}</td>
+                        <td class="{{ 'text-success' if data.pnl_value >= 0 else 'text-danger' }}">
+                            {{ data.pnl_value|comma }}
+                        </td>
+                        <td class="{{ 'text-success' if data.pnl_percent >= 0 else 'text-danger' }}">
+                            {{ "%.2f"|format(data.pnl_percent) }}%
+                        </td>
+                        <td class="{{ 'text-success' if data.annualized_return >= 0 else 'text-danger' }}">
+                            {{ "%.2f"|format(data.annualized_return) }}%
+                        </td>
+                        <td>{{ "%.2f"|format(data.yield_on_cost) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Card View for Holdings (Hidden on Desktop) -->
+<div class="mobile-holdings-cards d-none mb-4">
+    {% for key, data in holdings.items() %}
+    {% set symbol, brokerage = key %}
+    <div class="holding-card mb-3" data-symbol="{{ symbol }}" data-market="{{ data.market }}"
+        data-currency="{{ data.currency }}" data-brokerage="{{ brokerage }}">
+        <div class="card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <div>
+                    <strong class="fs-5">{{ symbol }}</strong>
+                    <span class="badge bg-secondary ms-2">{{ data.market }}</span>
+                    {% if brokerage %}
+                    <br><span class="badge bg-info mt-1">{{ brokerage }}</span>
+                    {% endif %}
+                </div>
+                <div class="text-end">
+                    <div class="fw-bold {{ 'text-success' if data.pnl_percent >= 0 else 'text-danger' }}">
+                        {{ "%.2f"|format(data.pnl_percent) }}%
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <small class="text-muted">Quantity</small>
+                        <div class="fw-semibold">{{ data.quantity|comma }}</div>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Avg Cost</small>
+                        <div class="fw-semibold">
+                            {% if data.quantity > 0 %}
+                            {{ (data.display_cost / data.quantity)|comma }}
+                            {% else %}
+                            0.00
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Current Price</small>
+                        <div class="fw-semibold">{{ data.current_price|comma }}</div>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Market Value</small>
+                        <div class="fw-semibold">{{ data.display_market_value|comma }} {{ data.display_currency }}</div>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">P&L ($)</small>
+                        <div class="fw-semibold {{ 'text-success' if data.pnl_value >= 0 else 'text-danger' }}">
+                            {{ data.pnl_value|comma }}
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Ann. Return</small>
+                        <div class="fw-semibold {{ 'text-success' if data.annualized_return >= 0 else 'text-danger' }}">
+                            {{ "%.2f"|format(data.annualized_return) }}%
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <small class="text-muted">Yield on Cost</small>
+                        <div class="fw-semibold">{{ "%.2f"|format(data.yield_on_cost) }}%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Transaction History -->\n<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Transaction History</h5>
+        <small class="text-muted">Right-click to Edit/Delete</small>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover" id="historyTable">
+                <caption class="visually-hidden">Investment transaction history</caption>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Symbol</th>
+                        <th>Brokerage</th>
+                        <th>Qty</th>
+                        <th>Price/Amt</th>
+                        <th>Fees</th>
+                        <th>Remark</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in investments %}
+                    <tr class="history-row" data-id="{{ inv.id }}" data-remark="{{ inv.remark or '' }}"
+                        data-brokerage="{{ inv.brokerage or '' }}">
+                        <td>{{ inv.date.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            <span
+                                class="badge {% if inv.type == 'Buy' %}bg-success{% elif inv.type == 'Sell' %}bg-danger{% elif inv.type == 'Dividend' %}bg-warning text-dark{% else %}bg-info{% endif %}">
+                                {{ inv.type }}
+                            </span>
+                        </td>
+                        <td>{{ inv.symbol }}</td>
+                        <td>
+                            {% if inv.brokerage %}
+                            <span class="badge bg-info">{{ inv.brokerage }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ inv.quantity|comma }}</td>
+                        <td>{{ inv.price|comma }} {{ inv.currency }}</td>
+                        <td>{{ inv.fees|comma }}</td>
+                        <td>{{ inv.remark or '' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Context Menus -->
+<div id="holdingContextMenu" class="dropdown-menu" style="display:none; position:absolute; z-index:1000;">
+    <a class="dropdown-item" href="#" id="ctxUpdatePrice">Update Price</a>
+    <div class="dropdown-divider"></div>
+    <a class="dropdown-item" href="#" id="ctxAddDividend">Add Dividend</a>
+    <a class="dropdown-item" href="#" id="ctxAddBonus">Add Bonus Share</a>
+    <a class="dropdown-item" href="#" id="ctxAddSplit">Add Share Split</a>
+</div>
+
+<div id="historyContextMenu" class="dropdown-menu" style="display:none; position:absolute; z-index:1000;">
+    <a class="dropdown-item" href="#" id="ctxEditTransaction">Edit (Remark)</a>
+    <a class="dropdown-item text-danger" href="#" id="ctxDeleteTransaction">Delete</a>
+</div>
+
+<!-- Modals -->
+<!-- Update Price Modal -->
+<div class="modal fade" id="priceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Price: <span id="priceSymbol"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('update_prices') }}">
+                <div class="modal-body">
+                    <input type="hidden" name="single_update" value="true">
+                    <div class="mb-3">
+                        <label class="form-label">Current Price</label>
+                        <input type="number" step="any" class="form-control" name="price" id="priceInput" required>
+                        <input type="hidden" name="symbol" id="priceSymbolInput">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Event Modal (Div/Bonus/Split) -->
+<div class="modal fade" id="eventModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="eventTitle">Add Event</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_investment') }}">
+                <div class="modal-body">
+                    <input type="hidden" name="symbol" id="eventSymbol">
+                    <input type="hidden" name="market" id="eventMarket">
+                    <input type="hidden" name="currency" id="eventCurrency">
+                    <input type="hidden" name="type" id="eventType">
+
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control" name="date" id="eventDate" required>
+                    </div>
+
+                    <div id="qtyField" class="mb-3">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" step="any" class="form-control" name="quantity" value="0">
+                    </div>
+
+                    <div id="priceField" class="mb-3">
+                        <label class="form-label" id="priceLabel">Amount</label>
+                        <input type="number" step="any" class="form-control" name="price" value="0">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Fees</label>
+                        <input type="number" step="0.01" class="form-control" name="fees" value="0.00">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Remark</label>
+                        <input type="text" class="form-control" name="remark" placeholder="Optional notes">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Add Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this transaction?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Remark Modal -->
+<div class="modal fade" id="editRemarkModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Transaction Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editRemarkForm" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editBrokerage" class="form-label">Brokerage Account</label>
+                        <input type="text" class="form-control" id="editBrokerage" name="brokerage"
+                            placeholder="e.g., Moomoo, Maybank Trade">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editRemark" class="form-label">Remark</label>
+                        <input type="text" class="form-control" id="editRemark" name="remark"
+                            placeholder="Optional notes">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Context Menu Logic
+        const holdingMenu = document.getElementById('holdingContextMenu');
+        const historyMenu = document.getElementById('historyContextMenu');
+        let currentSymbol = '';
+        let currentMarket = '';
+        let currentCurrency = '';
+        let currentTxId = '';
+        let currentRemark = '';
+
+        // Modals
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        const editRemarkModal = new bootstrap.Modal(document.getElementById('editRemarkModal'));
+
+        // Hide menus on click elsewhere
+        document.addEventListener('click', () => {
+            holdingMenu.style.display = 'none';
+            historyMenu.style.display = 'none';
+        });
+
+        // Holdings Context Menu
+        document.querySelectorAll('.holding-row').forEach(row => {
+            row.addEventListener('contextmenu', e => {
+                e.preventDefault();
+                currentSymbol = row.dataset.symbol;
+                currentMarket = row.dataset.market;
+                currentCurrency = row.dataset.currency;
+
+                holdingMenu.style.display = 'block';
+                holdingMenu.style.left = e.pageX + 'px';
+                holdingMenu.style.top = e.pageY + 'px';
+                historyMenu.style.display = 'none';
+            });
+        });
+
+        // History Context Menu
+        document.querySelectorAll('.history-row').forEach(row => {
+            row.addEventListener('contextmenu', e => {
+                e.preventDefault();
+                currentTxId = row.dataset.id;
+                currentRemark = row.dataset.remark || '';
+                currentBrokerage = row.dataset.brokerage || '';
+
+                historyMenu.style.display = 'block';
+                historyMenu.style.left = e.pageX + 'px';
+                historyMenu.style.top = e.pageY + 'px';
+                holdingMenu.style.display = 'none';
+            });
+        });
+
+        // Action Handlers
+        document.getElementById('ctxUpdatePrice').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('priceSymbol').innerText = currentSymbol;
+            document.getElementById('priceSymbolInput').value = currentSymbol;
+            new bootstrap.Modal(document.getElementById('priceModal')).show();
+        });
+
+        function openEventModal(type, title, showQty, showPrice, priceLabel) {
+            document.getElementById('eventTitle').innerText = title;
+            document.getElementById('eventType').value = type;
+            document.getElementById('eventSymbol').value = currentSymbol;
+            document.getElementById('eventMarket').value = currentMarket;
+            document.getElementById('eventCurrency').value = currentCurrency;
+            document.getElementById('eventDate').valueAsDate = new Date();
+
+            document.getElementById('qtyField').style.display = showQty ? 'block' : 'none';
+            document.getElementById('priceField').style.display = showPrice ? 'block' : 'none';
+            if (priceLabel) document.getElementById('priceLabel').innerText = priceLabel;
+
+            new bootstrap.Modal(document.getElementById('eventModal')).show();
+        }
+
+        document.getElementById('ctxAddDividend').addEventListener('click', (e) => {
+            e.preventDefault();
+            openEventModal('Dividend', 'Add Dividend', false, true, 'Total Dividend Amount');
+        });
+
+        document.getElementById('ctxAddBonus').addEventListener('click', (e) => {
+            e.preventDefault();
+            openEventModal('Bonus', 'Add Bonus Share', true, false, null);
+        });
+
+        document.getElementById('ctxAddSplit').addEventListener('click', (e) => {
+            e.preventDefault();
+            openEventModal('Split', 'Add Share Split', true, false, null);
+        });
+
+        // History Actions
+        document.getElementById('ctxEditTransaction').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('editBrokerage').value = currentBrokerage;
+            document.getElementById('editRemark').value = currentRemark;
+            document.getElementById('editRemarkForm').action = '/edit_investment/' + currentTxId;
+            editRemarkModal.show();
+        });
+
+        document.getElementById('ctxDeleteTransaction').addEventListener('click', (e) => {
+            e.preventDefault();
+            deleteModal.show();
+        });
+
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
+            if (currentTxId) {
+                fetch('/delete_investment/' + currentTxId, {
+                    method: 'POST'
+                }).then(response => {
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Failed to delete transaction');
+                    }
+                }).catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting transaction: ' + error);
+                });
+            }
+        });
+    });
+</script>
+
+<div class="modal fade" id="importPortfolioModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import Portfolio from Excel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('import_portfolio') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <p>Upload an Excel file (.xlsx) with your investment data.</p>
+                    <div class="alert alert-info">
+                        <strong>Format:</strong> Date | Symbol | Type | Quantity | Price | Fees | Currency | Exchange
+                        Rate | Remark<br>
+                        <small>Type: Buy/Sell/Dividend/Bonus/Split. Currency: MYR/USD.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Excel File</label>
+                        <input type="file" class="form-control" name="file" accept=".xlsx" required>
+                    </div>
+                    <a href="{{ url_for('download_portfolio_template') }}" class="btn btn-sm btn-outline-secondary">
+                        Download Template
+                    </a>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

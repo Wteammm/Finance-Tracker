@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+
+{% block dashboard %}cash-flow{% endblock %}
+{% block dashboard_title %}Cash Flow{% endblock %}
+
+
+{% block title %}Cash Flow Overview{% endblock %}
+
+{% block content %}
+<style>
+    /* Cash Flow Page - Light Professional Theme */
+    .hero-card {
+        background: linear-gradient(135deg, #52b788 0%, #40916c 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 3rem 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .hero-subtitle {
+        font-size: 0.9rem;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        opacity: 0.9;
+        margin-bottom: 0.5rem;
+    }
+
+    .hero-amount {
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin: 0.5rem 0;
+    }
+
+    .hero-description {
+        font-size: 0.95rem;
+        opacity: 0.85;
+    }
+
+    /* Summary Cards */
+    .cash-summary-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        height: 100%;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .cash-summary-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-subtitle-small {
+        font-size: 0.875rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.75rem;
+    }
+
+    .card-value-lg {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .value-success {
+        color: #28a745;
+    }
+
+    .value-danger {
+        color: #dc3545;
+    }
+
+    .value-warning {
+        color: #fd7e14;
+    }
+
+    .value-info {
+        color: #52b788;
+    }
+
+    /* Accordion */
+    .accordion-item {
+        background: white;
+        border: 1px solid #dee2e6;
+        margin-bottom: 1rem;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .accordion-button {
+        background: #f8f9fa;
+        color: #212529;
+        font-weight: 600;
+        padding: 1rem 1.25rem;
+    }
+
+    .accordion-button:not(.collapsed) {
+        background: #007bff;
+        color: white;
+    }
+
+    .accordion-body {
+        background: white;
+        padding: 1.25rem;
+    }
+
+    .list-group-item {
+        border: 1px solid #dee2e6;
+        padding: 0.75rem 1.25rem;
+    }
+
+    .list-group-item:hover {
+        background: #f8f9fa;
+    }
+</style>
+
+<div class="cash-flow-container container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="{{ url_for('cash_flow_export') }}" class="btn"
+            style="background: linear-gradient(135deg, #c9a66b 0%, #a67c52 100%); color: white !important; font-weight: 700; border: none; padding: 0.75rem 1.5rem; border-radius: 10px; box-shadow: 0 5px 15px rgba(166, 124, 82, 0.4); transition: all 0.3s ease;">
+            <i class="bi bi-file-earmark-excel"></i> Export to Excel
+        </a>
+    </div>
+
+    <!-- Hero Card - Available Cash -->
+    <div class="hero-card text-center" data-aos="fade-up">
+        <div class="hero-subtitle">Available to Spend Now</div>
+        <h1 class="hero-amount">RM {{ available_cash|comma }}</h1>
+        <p class="hero-description">After accounting for all current obligations</p>
+    </div>
+
+    <!-- Main Summary Cards -->
+    <div class="row g-3 mb-4" data-aos="fade-up" data-aos-delay="100">
+        <div class="col-md-3">
+            <div class="premium-card">
+                <div class="card-subtitle-gold">Total Cash</div>
+                <h4 class="card-value card-value-gold">RM {{ total_cash|comma }}</h4>
+                <small class="card-description">All cash assets</small>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="premium-card">
+                <div class="card-subtitle-gold">Current Obligations</div>
+                <h4 class="card-value card-value-danger">-RM {{ total_obligations|comma }}</h4>
+                <small class="card-description">Money you owe</small>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="premium-card">
+                <div class="card-subtitle-gold">Accounts Receivable</div>
+                <h4 class="card-value card-value-info">+RM {{ total_ar|comma }}</h4>
+                <small class="card-description">Money owed to you</small>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="premium-card">
+                <div class="card-subtitle-gold">Expected Cash</div>
+                <h4 class="card-value card-value-success">RM {{ expected_cash|comma }}</h4>
+                <small class="card-description">After receivables</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Obligation Breakdown Cards -->
+    <div class="row g-3 mb-4" data-aos="fade-up" data-aos-delay="200">
+        <div class="col-md-4">
+            <div class="obligation-card">
+                <h6 class="card-subtitle-gold">💼 Held on Behalf</h6>
+                <h4 class="card-value card-value-warning">RM {{ held_on_behalf|comma }}</h4>
+                <small class="card-description">Money held for others</small>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="obligation-card" style="border-left-color: #7f8c8d;">
+                <h6 class="card-subtitle-gold">🔒 On Hold</h6>
+                <h4 class="card-value" style="color: #95a5a6;">RM {{ on_hold|comma }}</h4>
+                <small class="card-description">Locked/pending funds</small>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="obligation-card" style="border-left-color: #ff6b6b;">
+                <h6 class="card-subtitle-gold">📋 Standard Debt</h6>
+                <h4 class="card-value card-value-danger">RM {{ standard_obligations|comma }}</h4>
+                <small class="card-description">Regular obligations</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Breakdowns -->
+    <div class="accordion" id="cashFlowAccordion" data-aos="fade-up" data-aos-delay="300">
+
+        <!-- Cash Breakdown -->
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCash">
+                    <strong>Cash Breakdown</strong> <span class="ms-2 text-white opacity-75">(RM {{ total_cash|comma
+                        }})</span>
+                </button>
+            </h2>
+            <div id="collapseCash" class="accordion-collapse collapse show" data-bs-parent="#cashFlowAccordion">
+                <div class="accordion-body">
+                    <ul class="list-group list-group-flush">
+                        {% for item in cash_items %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{{ url_for('balance_sheet') }}">{{ item.name }}</a>
+                                {% if item.liquidity_tier %}
+                                <span class="badge 
+                                    {% if item.liquidity_tier == 'High' %}bg-success
+                                    {% elif item.liquidity_tier == 'Medium' %}bg-warning
+                                    {% elif item.liquidity_tier == 'Low' %}bg-secondary
+                                    {% else %}bg-light text-dark{% endif %} ms-2">{{ item.liquidity_tier }}</span>
+                                {% endif %}
+                                {% if item.is_auto %}
+                                <span class="badge bg-info ms-2">Auto</span>
+                                {% endif %}
+                            </div>
+                            <span style="color: #d4af37; font-weight: 600;">RM {{ item.value|comma }}</span>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item text-muted fst-italic">No cash items</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Obligations Breakdown -->
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#collapseObligations">
+                    <strong>Current Obligations</strong> <span class="ms-2 text-white opacity-75">(RM {{
+                        total_obligations|comma
+                        }})</span>
+                </button>
+            </h2>
+            <div id="collapseObligations" class="accordion-collapse collapse" data-bs-parent="#cashFlowAccordion">
+                <div class="accordion-body">
+                    {% for obligation_type, group_data in grouped_liabilities.items() %}
+                    <!-- Obligation Type Header with Subtotal -->
+                    <div class="bg-light p-2 mb-2 d-flex justify-content-between align-items-center">
+                        <strong style="color: #d4af37;">{{ obligation_type }}</strong>
+                        <strong class="text-danger">RM {{ group_data.total|comma }}</strong>
+                    </div>
+                    <!-- Items in this category -->
+                    <ul class="list-group list-group-flush mb-3">
+                        {% for item in group_data.item_list %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center ps-4">
+                            <div>
+                                <a href="{{ url_for('balance_sheet') }}">
+                                    {% if item.asset_type and item.asset_type != 'Other' %}
+                                    <span class="text-muted">{{ item.asset_type }}:</span>
+                                    {% endif %}
+                                    {{ item.name }}
+                                </a>
+                            </div>
+                            <span class="text-danger">RM {{ item.value|comma }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted fst-italic">No current obligations</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- AR Breakdown -->
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#collapseAR">
+                    <strong>Accounts Receivable</strong> <span class="ms-2 text-white opacity-75">(RM {{ total_ar|comma
+                        }})</span>
+                </button>
+            </h2>
+            <div id="collapseAR" class="accordion-collapse collapse" data-bs-parent="#cashFlowAccordion">
+                <div class="accordion-body">
+                    <ul class="list-group list-group-flush">
+                        {% for item in ar_items %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{{ url_for('balance_sheet') }}">{{ item.name }}</a>
+                                {% if item.liquidity_tier %}
+                                <span class="badge 
+                                    {% if item.liquidity_tier == 'High' %}bg-success
+                                    {% elif item.liquidity_tier == 'Medium' %}bg-warning
+                                    {% elif item.liquidity_tier == 'Low' %}bg-secondary
+                                    {% else %}bg-light text-dark{% endif %} ms-2">{{ item.liquidity_tier }}</span>
+                                {% endif %}
+                            </div>
+                            <span class="text-info">RM {{ item.value|comma }}</span>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item text-muted fst-italic">No accounts receivable</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formula Explanation -->
+    <div class="formula-card card mt-4">
+        <div class="card-body">
+            <h6 class="card-title" style="color: #d4af37;">💡 How Available Cash is Calculated</h6>
+            <p class="mb-0">
+                <code>Available Cash = Total Cash - Current Obligations</code><br>
+                <code>Expected Cash = Available Cash + Accounts Receivable</code>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

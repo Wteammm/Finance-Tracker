@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Update Market Prices</h2>
+    <a href="{{ url_for('portfolio') }}" class="btn btn-secondary">Back to Portfolio</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="POST">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Current Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for symbol in symbols %}
+                        <tr>
+                            <td>{{ symbol }}</td>
+                            <td>
+                                <input type="number" step="any" class="form-control" name="price_{{ symbol }}"
+                                    value="{{ current_prices.get(symbol, '') }}" placeholder="Enter current price">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <button type="submit" class="btn btn-primary">Update Prices</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

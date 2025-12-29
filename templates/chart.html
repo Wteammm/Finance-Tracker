@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block dashboard %}daily-transaction{% endblock %}
+{% block dashboard_title %}Transaction Overview{% endblock %}
+
+{% block top_nav %}
+<a href="{{ url_for('chart') }}" class="active">Transaction Overview</a>
+{% endblock %}
+
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <form class="d-flex gap-2 justify-content-center" id="filterForm">
+            <select id="month" class="form-select" style="width: auto;">
+                <option value="">All Months</option>
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}">{{ m }}</option>
+                {% endfor %}
+            </select>
+            <select id="year" class="form-select" style="width: auto;">
+                <option value="">All Years</option>
+                {% for y in years %}
+                <option value="{{ y }}">{{ y }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="btn btn-primary" onclick="updateCharts()">Filter</button>
+        </form>
+    </div>
+</div>
+
+<div class="row" style="width: 75%; margin: 0 auto;">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Expenses by Category</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="expensesChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Income by Category</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="incomeChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let expensesChart = null;
+    let incomeChart = null;
+
+    function updateCharts() {
+        const month = document.getElementById('month').value;
+        const year = document.getElementById('year').value;
+
+        let url = '/chart-data';
+        const params = new URLSearchParams();
+        if (month) params.append('month', month);
+        if (year) params.append('year', year);
+        if (params.toString()) url += '?' + params.toString();
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                const expensesCtx = document.getElementById('expensesChart').getContext('2d');
+                const incomeCtx = document.getElementById('incomeChart').getContext('2d');
+
+                if (expensesChart) expensesChart.destroy();
+                if (incomeChart) incomeChart.destroy();
+
+                expensesChart = new Chart(expensesCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: Object.keys(data.expenses),
+                        datasets: [{
+                            data: Object.values(data.expenses),
+                            backgroundColor: [
+                                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#E7E9ED', '#71B37C'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'bottom' },
+                            title: { display: true, text: 'Expenses Distribution' }
+                        }
+                    }
+                });
+
+                incomeChart = new Chart(incomeCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: Object.keys(data.income),
+                        datasets: [{
+                            data: Object.values(data.income),
+                            backgroundColor: [
+                                '#4BC0C0', '#36A2EB', '#FFCE56', '#FF6384', '#9966FF', '#FF9F40', '#E7E9ED', '#71B37C'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'bottom' },
+                            title: { display: true, text: 'Income Distribution' }
+                        }
+                    }
+                });
+            });
+    }
+
+    document.addEventListener('DOMContentLoaded', updateCharts);
+</script>
+{% endblock %}

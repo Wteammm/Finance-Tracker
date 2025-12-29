@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block dashboard_title %}My Account{% endblock %}
+
+{% block top_nav %}
+<a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+
+            <!-- Header -->
+            <div class="text-center mb-5">
+                <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3 shadow"
+                    style="width: 80px; height: 80px;">
+                    <i class="bi bi-person-circle" style="font-size: 3rem;"></i>
+                </div>
+                <h2 class="fw-bold text-success">{{ user.username }}</h2>
+                <p class="text-muted">{{ user.email }}</p>
+            </div>
+
+            <!-- Profile Info Card -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom border-light py-3">
+                    <h5 class="mb-0 text-success"><i class="bi bi-person-lines-fill me-2"></i>Profile Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <label class="col-sm-3 col-form-label text-muted">Username</label>
+                        <div class="col-sm-9">
+                            <input type="text" readonly class="form-control-plaintext fw-bold"
+                                value="{{ user.username }}">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <label class="col-sm-3 col-form-label text-muted">Email</label>
+                        <div class="col-sm-9">
+                            <input type="text" readonly class="form-control-plaintext"
+                                value="{{ user.email or 'Not set' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Actions -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom border-light py-3">
+                    <h5 class="mb-0 text-success"><i class="bi bi-shield-lock me-2"></i>Security</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">Password</h6>
+                            <small class="text-muted">Last changed: Never (Log not available)</small>
+                        </div>
+                        <a href="{{ url_for('change_password') }}" class="btn btn-outline-success">
+                            <i class="bi bi-key-fill me-1"></i> Change Password
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="card border-danger shadow-sm">
+                <div class="card-header bg-danger text-white py-3">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Danger Zone</h5>
+                </div>
+                <div class="card-body">
+
+                    <!-- Reset Data -->
+                    <div class="row align-items-center mb-4 border-bottom pb-4">
+                        <div class="col-md-8">
+                            <h6 class="text-danger fw-bold">Reset Financial Data</h6>
+                            <p class="text-muted small mb-0">
+                                This will <strong>permanently delete</strong> all your transactions, balance items,
+                                investments, budgets, and history.
+                                Your user account (username, password, email) will remain intact.
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-md-end mt-2 mt-md-0">
+                            <button class="btn btn-outline-danger" data-bs-toggle="modal"
+                                data-bs-target="#resetDataModal">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Data
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Delete Account -->
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h6 class="text-danger fw-bold">Delete Account</h6>
+                            <p class="text-muted small mb-0">
+                                This will <strong>permanently delete</strong> your account and ALL associated data.
+                                You will be logged out and cannot recover this account.
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-md-end mt-2 mt-md-0">
+                            <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteAccountModal">
+                                <i class="bi bi-trash me-1"></i> Delete Account
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Reset Data Modal -->
+<div class="modal fade" id="resetDataModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning-subtle">
+                <h5 class="modal-title text-danger"><i class="bi bi-exclamation-circle-fill me-2"></i>Reset All Data?
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning border-warning">
+                    <strong>Warning:</strong> You are about to wipe all your financial records (Transactions, Net Worth,
+                    Investments).
+                    <br><br>
+                    This cannot be undone.
+                </div>
+                <form action="{{ url_for('reset_data') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Enter your password to confirm:</label>
+                        <input type="password" class="form-control" name="password" required>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger">Yes, Reset My Data</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Account Modal -->
+<div class="modal fade" id="deleteAccountModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-danger">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-trash-fill me-2"></i>Delete Account?</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <strong>CRITICAL WARNING:</strong> This will delete your User Account and ALL data.
+                    <br>
+                    You will lose access immediately.
+                </div>
+                <form action="{{ url_for('delete_account') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Enter your password to confirm:</label>
+                        <input type="password" class="form-control" name="password" required>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger">Permanently Delete Account</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
