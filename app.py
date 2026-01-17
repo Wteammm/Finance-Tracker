@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, case, extract, text
 from datetime import datetime
@@ -7,9 +7,27 @@ from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///finance.db'
+
+# Improved Database Path Handling for Local and PythonAnywhere
+basedir = os.path.abspath(os.path.dirname(__file__))
+# Ensure instance folder exists
+instance_path = os.path.join(basedir, 'instance')
+os.makedirs(instance_path, exist_ok=True)
+
+# Point to instance/finance.db (where the actual data is stored)
+db_path = os.path.join(instance_path, 'finance.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'finance_tracker_secret_key_2024'
+
+@app.template_filter('comma')
+def comma_filter(value):
+    try:
+        if value is None:
+            return "0.00"
+        return "{:,.2f}".format(float(value))
+    except (ValueError, TypeError):
+        return value
 
 db = SQLAlchemy(app)
 
@@ -31,6 +49,100 @@ class User(db.Model):
     
     def __repr__(self):
         return f'<User {self.username}>'
+
+# ===== AUTHENTICATION =====
+
+def login_required(f):
+    """Decorator to protect routes - requires login"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('user_id'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# --- Category Management APIs ---
+@app.route('/api/categories', methods=['GET'])
+@login_required
+def get_categories():
+    categories = CustomCategory.query.filter_by(user_id=session.get('user_id'), is_active=True).all()
+    
+    result = {
+        'income': [],
+        'expense': [],
+        'savings': []
+    }
+    
+    for cat in categories:
+        data = {
+            'id': cat.id, 
+            'name': cat.name, 
+            'is_custom': cat.is_custom
+        }
+        if cat.category_type == 'Income':
+            result['income'].append(data)
+        elif cat.category_type == 'Expense':
+            result['expense'].append(data)
+        elif cat.category_type == 'Savings':
+            result['savings'].append(data)
+            
+    return jsonify(result)
+
+@app.route('/api/categories', methods=['POST'])
+@login_required
+def add_category():
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    ctype = data.get('type') # Income, Expense, Savings
+    
+    if not name or not ctype:
+        return jsonify({'success': False, 'error': 'Invalid data'}), 400
+        
+    # Check duplicate
+    existing = CustomCategory.query.filter_by(
+        user_id=session.get('user_id'), 
+        name=name, 
+        category_type=ctype
+    ).first()
+    
+    if existing:
+        if not existing.is_active:
+            existing.is_active = True
+            db.session.commit()
+            return jsonify({'success': True, 'restored': True})
+        return jsonify({'success': False, 'error': 'Category already exists'}), 400
+        
+    new_cat = CustomCategory(
+        user_id=session.get('user_id'),
+        name=name,
+        category_type=ctype,
+        is_active=True,
+        is_custom=True
+    )
+    db.session.add(new_cat)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/categories/<int:id>', methods=['DELETE'])
+@login_required
+def delete_category(id):
+    cat = CustomCategory.query.filter_by(id=id, user_id=session.get('user_id')).first_or_404()
+    
+    # Check if category is used in existing transactions
+    tx_count = Transaction.query.filter_by(
+        user_id=session.get('user_id'),
+        category=cat.name
+    ).count()
+    
+    if tx_count > 0:
+        return jsonify({
+            'success': False, 
+            'error': f"Cannot delete '{cat.name}' because it contains {tx_count} transaction(s). Please reassign them first."
+        }), 400
+
+    cat.is_active = False # Soft delete
+    db.session.commit()
+    return jsonify({'success': True})
 
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -252,16 +364,7 @@ def get_portfolio_summary():
     return total_invested_myr
 
 
-# ===== AUTHENTICATION =====
 
-def login_required(f):
-    """Decorator to protect routes - requires login"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('user_id'):
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 
@@ -393,19 +496,64 @@ def index():
 
     # Filtering - Default to current month if no filters specified
     current_date = datetime.now()
-    month = request.args.get('month', default=current_date.month, type=int)
-    year = request.args.get('year', default=current_date.year, type=int)
+    # Check if month/year were explicitly provided (even if empty string)
+    month_param = request.args.get('month', type=str)
+    year_param = request.args.get('year', type=str)
+    
+    # If no parameters at all, default to current month/year
+    # If empty string, user selected "All Months"
+    if month_param is None:
+        month = current_date.month
+    elif month_param == '':
+        month = None  # All months
+    else:
+        month = int(month_param)
+    
+    if year_param is None:
+        year = current_date.year
+    elif year_param == '':
+        year = None  # All years
+    else:
+        year = int(year_param)
+    
     filter_category = request.args.get('category', type=str)
     min_amount = request.args.get('min_amount', type=float)
     max_amount = request.args.get('max_amount', type=float)
     
     query = Transaction.query.filter_by(user_id=session.get('user_id'))
-    # Always filter by month and year (now defaults to current month/year)
-    query = query.filter(extract('month', Transaction.date) == month, extract('year', Transaction.date) == year)
+    # Only filter by month/year if they are specified
+    if month and year:
+        query = query.filter(extract('month', Transaction.date) == month, extract('year', Transaction.date) == year)
+    elif year:
+        query = query.filter(extract('year', Transaction.date) == year)
+    elif month:
+        query = query.filter(extract('month', Transaction.date) == month)
     
-    # Category filter
-    if filter_category:
-        query = query.filter(Transaction.category == filter_category)
+    # Category filter (Multi-select)
+    filter_categories = request.args.getlist('category')
+    # Filter out empty strings which represent 'All Categories'
+    filter_categories = [c for c in filter_categories if c]
+    
+    # Handle "Group" filters (Income, Expense, Savings)
+    # If a group is selected, we fetch all categories of that type
+    effective_categories = set()
+    
+    if filter_categories:
+        # Get all categories to map types
+        all_cats = CustomCategory.query.filter_by(user_id=session.get('user_id'), is_active=True).all()
+        cat_map = {c.name: c.category_type for c in all_cats}
+        
+        for cat in filter_categories:
+            if cat in ['Income', 'Expense', 'Savings']:
+                # It's a group, add all categories of this type
+                group_cats = [c.name for c in all_cats if c.category_type == cat]
+                effective_categories.update(group_cats)
+            else:
+                # It's a specific category
+                effective_categories.add(cat)
+                
+        if effective_categories:
+            query = query.filter(Transaction.category.in_(effective_categories))
     
     # Amount range filters
     if min_amount is not None:
@@ -415,8 +563,13 @@ def index():
         
     transactions = query.order_by(Transaction.date.desc()).all()
     
-    # Calculate Total Balance (Global)
+    # Calculate Total Balance (Global for the user or for current selection)
+    # Note: total_balance on dashboard usually represents Net Worth (sum of accounts)
+    # but here we use the sum of selected transactions as per previous logic
     total_balance = sum(t.amount for t in transactions)
+    # Also calculate spent and saved for the selection
+    total_spent = sum(t.amount for t in transactions if t.amount < 0)
+    total_saved = sum(t.amount for t in transactions if t.category in [c.name for c in CustomCategory.query.filter_by(user_id=session.get('user_id'), category_type='Savings').all()])
     
     # Get Accounts (BalanceItems) for Dropdown (Assets & Liabilities)
     accounts = BalanceItem.query.filter(BalanceItem.classification.in_(['Current Asset', 'Current Liability']), BalanceItem.user_id == session.get('user_id')).all()
@@ -457,8 +610,8 @@ def index():
     years = db.session.query(extract('year', Transaction.date)).filter(Transaction.user_id == session.get('user_id')).distinct().order_by(extract('year', Transaction.date).desc()).all()
     years = [int(y[0]) for y in years]
     
-    current_month = month if month else datetime.now().month
-    current_year = year if year else datetime.now().year
+    current_month = month
+    current_year = year
 
     # Get user's custom categories
     income_categories = CustomCategory.query.filter_by(
@@ -481,10 +634,34 @@ def index():
     for date, group in groupby(transactions, key=attrgetter('date')):
         transactions_by_date[date] = list(group)
 
+    # --- V2.4 Savings Separation Logic ---
+    # Fetch all user categories to map names to types
+    all_cats = CustomCategory.query.filter_by(user_id=session.get('user_id'), is_active=True).all()
+    cat_type_map = {c.name: c.category_type for c in all_cats}
+    
+    total_spent = 0.0
+    total_saved = 0.0
+    
+    for t in transactions:
+        # Determine type (default 'Expense' if unknown and negative, 'Income' if positive)
+        # But for separation, we rely on the Category Type.
+        ctype = cat_type_map.get(t.category)
+        
+        if ctype == 'Expense':
+            total_spent += t.amount # Amount is negative for expense
+        elif ctype == 'Savings':
+            total_saved += abs(t.amount) # Treat transfers as positive savings
+            
+    # Get Saving Categories for Dropdown
+    savings_categories = [c for c in all_cats if c.category_type == 'Savings']
+    savings_categories.sort(key=lambda x: x.name)
+
     return render_template('index.html', 
         transactions=transactions, 
         transactions_by_date=transactions_by_date,
         total_balance=total_balance, 
+        total_spent=total_spent,
+        total_saved=total_saved,
         years=years, 
         current_month=current_month, 
         current_year=current_year, 
@@ -494,6 +671,7 @@ def index():
         accounts=accounts, 
         income_categories=income_categories, 
         expense_categories=expense_categories, 
+        savings_categories=savings_categories,
         pending_recurring=pending_recurring, 
         current_date=current_date)
 
@@ -558,6 +736,8 @@ def delete(id):
     db.session.commit()
     # print(f"DEBUG: Deleted transaction {id}")
     return redirect(url_for('index'))
+
+
 
 @app.route('/api/transactions/bulk-delete', methods=['POST'])
 @login_required
@@ -2263,11 +2443,39 @@ def import_transactions():
         
         db.session.commit()
         
+        # --- V2.3: Category Mapping Logic ---
+        # 1. Identify all unique categories in the import
+        import_categories = set(item['category'] for item in staged_data if item['category'])
+        
+        # 2. Get all existing categories (System + Custom)
+        existing_cats_query = CustomCategory.query.filter_by(user_id=session.get('user_id')).all()
+        existing_cat_names = set(c.name for c in existing_cats_query)
+        
+        # 3. Find NEW categories and guess their type
+        new_cat_names = sorted(list(import_categories - existing_cat_names))
+        new_categories = {}
+        
+        for cat in new_cat_names:
+            # Sum amounts for this category
+            total = sum(item['amount'] for item in staged_data if item['category'] == cat)
+            new_categories[cat] = 'Income' if total > 0 else 'Expense'
+        
+        # 4. Prepare system categories for dropdown (Grouped)
+        system_categories = {
+            'Income': sorted([c.name for c in existing_cats_query if c.category_type == 'Income']),
+            'Expense': sorted([c.name for c in existing_cats_query if c.category_type == 'Expense']),
+            'Savings': sorted([c.name for c in existing_cats_query if c.category_type == 'Savings'])
+        }
+            
         if not staged_data:
             flash('No valid transactions found in file.', 'warning')
             return redirect(url_for('index'))
             
-        return render_template('import_review.html', duplicates=duplicates, new_items=new_items)
+        return render_template('import_review.html', 
+                               duplicates=duplicates, 
+                               new_items=new_items,
+                               new_categories=new_categories,
+                               system_categories=system_categories)
         
     except Exception as e:
         flash(f'Error processing file: {str(e)}', 'danger')
@@ -2298,18 +2506,66 @@ def confirm_import():
     selected_ids = request.form.getlist('import_indices')
     selected_ids = [int(idx) for idx in selected_ids]
     
+    # Get auto-create setting
+    auto_create = request.form.get('auto_create_categories') == '1'
+    
+    # Pre-fetch existing categories to avoid duplicates
+    # Pre-fetch existing categories to avoid duplicates
+    existing_cats = CustomCategory.query.filter_by(user_id=session.get('user_id')).all()
+    existing_map = {c.name.lower(): c for c in existing_cats}
+    existing_cat_names = set(c.name for c in existing_cats)
+    created_in_session = set() # Track new categories creating in this batch
+
     # Import selected transactions
     imported_count = 0
+    skipped_count = 0
+    
     for staged in staged_items:
         # Match by index (staged.id - first_id = index)
         first_id = staged_items[0].id
         item_index = staged.id - first_id
         
         if item_index in selected_ids:
+            
+            # --- V2.3 Mapping Logic ---
+            final_category = staged.category
+            mapping_key = f"map_{staged.category}"
+            mapping_choice = request.form.get(mapping_key)
+            
+            # If user mapped to an existing category
+            if mapping_choice and not mapping_choice.startswith('__NEW_'):
+                final_category = mapping_choice
+            
+            # If creating new category
+            else:
+                # Check if it needs to be created
+                if final_category not in existing_cat_names and final_category not in created_in_session:
+                    if auto_create:
+                        # Determine Type
+                        cat_type = 'Expense' # Default
+                        if mapping_choice == '__NEW_INCOME__':
+                            cat_type = 'Income'
+                        elif mapping_choice == '__NEW_SAVINGS__':
+                            cat_type = 'Savings'
+                        
+                        # Create new Custom Category
+                        new_cat = CustomCategory(
+                            user_id=session.get('user_id'),
+                            name=final_category,
+                            category_type=cat_type,
+                            is_custom=True
+                        )
+                        db.session.add(new_cat)
+                        created_in_session.add(final_category)
+                    else:
+                        # Skip if auto-create is OFF
+                        skipped_count += 1
+                        continue
+
             new_transaction = Transaction(
                 date=staged.date,
                 description=staged.description,
-                category=staged.category,
+                category=final_category,
                 amount=staged.amount,
                 user_id=session.get('user_id')
             )
@@ -2324,7 +2580,12 @@ def confirm_import():
     db.session.commit()
     session.pop('import_session_id', None)
     
-    flash(f'Successfully imported {imported_count} transactions!', 'success')
+    msg = f'Successfully imported {imported_count} transactions!'
+    if skipped_count > 0:
+        msg += f' Skipped {skipped_count} transactions due to unknown categories (Auto-create OFF).'
+        flash(msg, 'warning')
+    else:
+        flash(msg, 'success')
     return redirect(url_for('index'))
 
 
@@ -3493,135 +3754,6 @@ def sync_balance_item():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-# ===== CATEGORY MANAGEMENT API ENDPOINTS =====
-
-@app.route('/api/categories', methods=['GET'])
-@login_required
-def get_categories():
-    """Get user's active categories grouped by type"""
-    user_id = session.get('user_id')
-    
-    income_categories = CustomCategory.query.filter_by(
-        user_id=user_id,
-        category_type='Income',
-        is_active=True
-    ).order_by(CustomCategory.name).all()
-    
-    expense_categories = CustomCategory.query.filter_by(
-        user_id=user_id,
-        category_type='Expense',
-        is_active=True
-    ).order_by(CustomCategory.name).all()
-    
-    return jsonify({
-        'income': [{'id': c.id, 'name': c.name, 'is_custom': c.is_custom} for c in income_categories],
-        'expense': [{'id': c.id, 'name': c.name, 'is_custom': c.is_custom} for c in expense_categories]
-    })
-
-@app.route('/api/categories', methods=['POST'])
-@login_required
-def add_category():
-    """Add new custom category"""
-    try:
-        data = request.get_json()
-        user_id = session.get('user_id')
-        
-        name = data.get('name', '').strip()
-        category_type = data.get('type')  # 'Income' or 'Expense'
-        
-        if not name or not category_type:
-            return jsonify({'success': False, 'error': 'Name and type are required'}), 400
-        
-        # Check for duplicates
-        existing = CustomCategory.query.filter_by(
-            user_id=user_id,
-            name=name,
-            category_type=category_type
-        ).first()
-        
-        if existing:
-            if existing.is_active:
-                return jsonify({'success': False, 'error': 'Category already exists'}), 400
-            else:
-                # Restore hidden category
-                existing.is_active = True
-                db.session.commit()
-                return jsonify({'success': True, 'id': existing.id, 'restored': True})
-        
-        # Create new category
-        new_category = CustomCategory(
-            user_id=user_id,
-            name=name,
-            category_type=category_type,
-            is_custom=True,
-            is_active=True
-        )
-        db.session.add(new_category)
-        db.session.commit()
-        
-        return jsonify({'success': True, 'id': new_category.id})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/categories/<int:category_id>', methods=['DELETE'])
-@login_required
-def delete_category(category_id):
-    """Delete or hide category"""
-    try:
-        user_id = session.get('user_id')
-        category = CustomCategory.query.filter_by(id=category_id, user_id=user_id).first()
-        
-        if not category:
-            return jsonify({'success': False, 'error': 'Category not found'}), 404
-        
-        if category.is_custom:
-            # Hard delete custom categories
-            db.session.delete(category)
-        else:
-            # Soft delete default categories (hide)
-            category.is_active = False
-        
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/categories/hidden', methods=['GET'])
-@login_required
-def get_hidden_categories():
-    """Get user's hidden default categories"""
-    user_id = session.get('user_id')
-    
-    hidden = CustomCategory.query.filter_by(
-        user_id=user_id,
-        is_active=False,
-        is_custom=False
-    ).order_by(CustomCategory.category_type, CustomCategory.name).all()
-    
-    return jsonify({
-        'categories': [{'id': c.id, 'name': c.name, 'type': c.category_type} for c in hidden]
-    })
-
-@app.route('/api/categories/<int:category_id>/restore', methods=['POST'])
-@login_required
-def restore_category(category_id):
-    """Restore hidden default category"""
-    try:
-        user_id = session.get('user_id')
-        category = CustomCategory.query.filter_by(id=category_id, user_id=user_id).first()
-        
-        if not category:
-            return jsonify({'success': False, 'error': 'Category not found'}), 404
-        
-        category.is_active = True
-        db.session.commit()
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # Password Management Routes (v2.1)
@@ -3886,6 +4018,11 @@ def init_db():
         return "✅ Database tables created successfully! User table is ready. You can now use registration."
     except Exception as e:
         return f"❌ Error creating tables: {str(e)}"
+
+@app.route('/service-worker.js')
+def service_worker():
+    return send_from_directory(os.path.join(app.root_path, 'static/js'),
+                               'service-worker.js', mimetype='application/javascript')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

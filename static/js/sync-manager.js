@@ -7,6 +7,7 @@ class SyncManager {
         this.isSyncing = false;
         this.syncInterval = null;
         this.statusCallbacks = [];
+        this.lastNotificationTime = 0; // Track last notification timestamp
     }
 
     // Initialize sync manager
@@ -70,7 +71,13 @@ class SyncManager {
             await this.cleanupSynced();
 
             console.log('Sync completed successfully');
-            this.showNotification('✅ All data synced successfully', 'success');
+            // Only show notification if 5 minutes have passed since last notification
+            const now = Date.now();
+            const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
+            if (now - this.lastNotificationTime >= fiveMinutes) {
+                this.showNotification('✅ All data synced successfully', 'success');
+                this.lastNotificationTime = now;
+            }
         } catch (error) {
             console.error('Sync failed:', error);
             this.showNotification('⚠️ Sync failed. Will retry automatically.', 'warning');
@@ -98,9 +105,14 @@ class SyncManager {
                 });
 
                 if (response.ok) {
-                    await offlineDB.markSynced('transactions', item.id);
+                    const result = await response.json().catch(() => null);
+                    if (result && result.success) {
+                        await offlineDB.markSynced('transactions', item.id);
+                    } else {
+                        console.error('Failed to sync transaction (Server Error or Auth):', item.id, result);
+                    }
                 } else {
-                    console.error('Failed to sync transaction:', item.id);
+                    console.error('Failed to sync transaction (HTTP Error):', item.id, response.status);
                 }
             } catch (error) {
                 console.error('Error syncing transaction:', error);
@@ -127,9 +139,14 @@ class SyncManager {
                 });
 
                 if (response.ok) {
-                    await offlineDB.markSynced('investments', item.id);
+                    const result = await response.json().catch(() => null);
+                    if (result && result.success) {
+                        await offlineDB.markSynced('investments', item.id);
+                    } else {
+                        console.error('Failed to sync investment (Server Error or Auth):', item.id, result);
+                    }
                 } else {
-                    console.error('Failed to sync investment:', item.id);
+                    console.error('Failed to sync investment (HTTP Error):', item.id, response.status);
                 }
             } catch (error) {
                 console.error('Error syncing investment:', error);
@@ -156,9 +173,14 @@ class SyncManager {
                 });
 
                 if (response.ok) {
-                    await offlineDB.markSynced('balanceItems', item.id);
+                    const result = await response.json().catch(() => null);
+                    if (result && result.success) {
+                        await offlineDB.markSynced('balanceItems', item.id);
+                    } else {
+                        console.error('Failed to sync balance item (Server Error or Auth):', item.id, result);
+                    }
                 } else {
-                    console.error('Failed to sync balance item:', item.id);
+                    console.error('Failed to sync balance item (HTTP Error):', item.id, response.status);
                 }
             } catch (error) {
                 console.error('Error syncing balance item:', error);

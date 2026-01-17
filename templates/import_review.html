@@ -91,6 +91,67 @@
                 </div>
             </div>
 
+            <!-- Category Mapping Card (Only if new categories exist) -->
+            {% if new_categories %}
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white fw-bold">
+                    <i class="bi bi-diagram-3-fill me-2"></i> Category Mapping
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">
+                        The following categories from your file are not in your system. Map them to existing categories
+                        or create new ones.
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 40%">File Category</th>
+                                    <th>Action / Target Category</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cat, guessed_type in new_categories.items() %}
+                                <tr>
+                                    <td class="fw-bold text-primary">{{ cat }}</td>
+                                    <td>
+                                        <select class="form-select form-select-sm" name="map_{{ cat }}">
+                                            <option value="__NEW_EXPENSE__" class="fw-bold" {{ 'selected' if
+                                                guessed_type=='Expense' else '' }}>✨ Create New (Expense): {{ cat }}
+                                            </option>
+                                            <option value="__NEW_INCOME__" class="fw-bold" {{ 'selected' if
+                                                guessed_type=='Income' else '' }}>✨ Create New (Income): {{ cat }}
+                                            </option>
+                                            <option value="__NEW_SAVINGS__" class="fw-bold">✨ Create New (Savings): {{
+                                                cat }}
+                                            </option>
+                                            <option disabled>──────────────</option>
+                                            <optgroup label="Income Categories">
+                                                {% for sys_cat in system_categories['Income'] %}
+                                                <option value="{{ sys_cat }}">{{ sys_cat }}</option>
+                                                {% endfor %}
+                                            </optgroup>
+                                            <optgroup label="Expense Categories">
+                                                {% for sys_cat in system_categories['Expense'] %}
+                                                <option value="{{ sys_cat }}">{{ sys_cat }}</option>
+                                                {% endfor %}
+                                            </optgroup>
+                                            <optgroup label="Savings Categories">
+                                                {% for sys_cat in system_categories['Savings'] %}
+                                                <option value="{{ sys_cat }}">{{ sys_cat }}</option>
+                                                {% endfor %}
+                                            </optgroup>
+                                        </select>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <div class="card mb-3 border-info">
                 <div class="card-header bg-info text-white">
                     <i class="bi bi-gear-fill me-2"></i> Import Options
@@ -100,10 +161,12 @@
                         <input type="checkbox" class="form-check-input" id="autoCreateCategories"
                             name="auto_create_categories" value="1" checked>
                         <label class="form-check-label" for="autoCreateCategories">
-                            <strong>Auto-create new categories from import</strong>
-                            <br><small class="text-muted">If unchecked, transactions with unknown categories will be
-                                skipped. You can manage categories using the "Manage Categories" button on the main
-                                page.</small>
+                            <strong>Auto-create new categories import</strong>
+                            <br><small class="text-muted">
+                                If checked: Categories set to "Create New" above will be added to your system.<br>
+                                If unchecked: Categories set to "Create New" will cause those transactions to be
+                                <strong>SKIPPED</strong>.
+                            </small>
                         </label>
                     </div>
                 </div>

@@ -10,61 +10,9 @@
 {% endblock %}
 
 {% block content %}
-<style>
-    /* Remove any transforms from parent cards that create new containing blocks for fixed elements */
-    .card.text-white.bg-success,
-    .card.text-white.bg-success:hover,
-    .row.mb-4,
-    .main-content {
-        transform: none !important;
-        transition: none !important;
-        perspective: none !important;
-        filter: none !important;
-        contain: none !important;
-    }
-
-    .category-dropdown-menu {
-        max-height: 500px;
-        overflow-y: auto;
-        min-width: 300px;
-        z-index: 999999 !important;
-        background: white !important;
-        border: 1px solid #dee2e6 !important;
-        border-radius: 8px !important;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
-        padding: 0.5rem !important;
-    }
-
-    .category-dropdown-menu.show {
-        position: fixed !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-    }
-
-    /* Force overflow visible on all parents to prevent clipping */
-    .main-content,
-    .card,
-    .card-body,
-    .table-responsive,
-    .container-fluid {
-        overflow: visible !important;
-    }
-
-    /* Prevent table rows from interfering with z-index */
-    #transactionsTable,
-    #transactionsTable * {
-        position: static !important;
-    }
-</style>
-
-
-
-
-<div class="row mb-4" style="position: relative; z-index: 100;">
+<div class="row mb-4">
     <div class="col-12">
-        <div class="card text-white bg-success mb-3" style="overflow: visible; position: relative; z-index: 100;">
+        <div class="card text-white bg-success mb-3">
             <div class="card-header d-flex justify-content-between align-items-center"
                 style="background-color: #52b788 !important; color: white !important; font-weight: 700; font-size: 1.5rem;">
                 <span>Total Balance</span>
@@ -84,7 +32,7 @@
                     </button>
                 </div>
             </div>
-            <div class="card-body" style="overflow: visible;">
+            <div class="card-body">
                 <div class="row text-center">
                     <div class="col-4 border-end border-light">
                         <small class="d-block text-white-50" style="font-weight: 600;">Available</small>
@@ -102,9 +50,9 @@
 
                 <!-- Filter Transactions integrated within Total Balance card -->
                 <div class="border-top pt-3 px-3 pb-3 mt-3"
-                    style="border-color: rgba(255,255,255,0.3) !important; background-color: #2d6a4f; border-radius: 8px; margin: 0 -1rem; overflow: visible;">
+                    style="border-color: rgba(255,255,255,0.3) !important; background-color: #2d6a4f; border-radius: 8px; margin: 0 -1rem;">
                     <form method="GET" action="{{ url_for('index') }}">
-                        <div class="row g-2 align-items-end" style="overflow: visible;">
+                        <div class="row g-2 align-items-end">
                             <div class="col-md-3">
                                 <label class="form-label small mb-1"
                                     style="color: rgba(255,255,255,0.9); font-weight: 600;">Month</label>
@@ -126,86 +74,31 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-3" style="position: relative;">
+                            <div class="col-md-3">
                                 <label class="form-label small mb-1"
                                     style="color: rgba(255,255,255,0.9); font-weight: 600;">Category</label>
-                                <div class="dropdown">
-                                    <button class="form-select form-select-sm text-start" type="button"
-                                        id="categoryDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside"
-                                        aria-expanded="false"
-                                        style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                        All Categories
-                                    </button>
-                                    <div class="dropdown-menu p-2 category-dropdown-menu"
-                                        aria-labelledby="categoryDropdown">
-
-
-
-                                        <!-- All Categories -->
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="category" value=""
-                                                id="chk_all" checked>
-                                            <label class="form-check-label fw-bold" for="chk_all">All Categories</label>
-                                        </div>
-                                        <div class="dropdown-divider"></div>
-
-                                        <!-- Income Group -->
-                                        <div class="fw-bold text-success small py-1">收入 (Income)</div>
-                                        <div class="form-check">
-                                            <input class="form-check-input category-group" type="checkbox"
-                                                name="category" value="Income" id="chk_income">
-                                            <label class="form-check-label" for="chk_income">All Income</label>
-                                        </div>
+                                <select class="form-select form-select-sm" name="category">
+                                    <option value="">All Categories</option>
+                                    <optgroup label="收入 (Income)">
                                         {% for cat in income_categories %}
-                                        <div class="form-check ms-3">
-                                            <input class="form-check-input category-item" type="checkbox"
-                                                name="category" value="{{ cat.name }}" id="chk_inc_{{ loop.index }}"
-                                                data-group="Income">
-                                            <label class="form-check-label" for="chk_inc_{{ loop.index }}">{{ cat.name
-                                                }}</label>
-                                        </div>
+                                        <option value="{{ cat.name }}" {% if filter_category==cat.name %}selected{%
+                                            endif %}>{{ cat.name }}</option>
                                         {% endfor %}
-                                        <div class="dropdown-divider"></div>
-
-                                        <!-- Expense Group -->
-                                        <div class="fw-bold text-danger small py-1">支出 (Expense)</div>
-                                        <div class="form-check">
-                                            <input class="form-check-input category-group" type="checkbox"
-                                                name="category" value="Expense" id="chk_expense">
-                                            <label class="form-check-label" for="chk_expense">All Expense</label>
-                                        </div>
+                                    </optgroup>
+                                    <optgroup label="支出 (Expense)">
                                         {% for cat in expense_categories %}
-                                        <div class="form-check ms-3">
-                                            <input class="form-check-input category-item" type="checkbox"
-                                                name="category" value="{{ cat.name }}" id="chk_exp_{{ loop.index }}"
-                                                data-group="Expense">
-                                            <label class="form-check-label" for="chk_exp_{{ loop.index }}">{{ cat.name
-                                                }}</label>
-                                        </div>
+                                        <option value="{{ cat.name }}" {% if filter_category==cat.name %}selected{%
+                                            endif %}>{{ cat.name }}</option>
                                         {% endfor %}
-                                        <div class="dropdown-divider"></div>
-
-                                        <!-- Savings Group -->
-                                        <div class="fw-bold text-info small py-1">储蓄 (Savings)</div>
-                                        <div class="form-check">
-                                            <input class="form-check-input category-group" type="checkbox"
-                                                name="category" value="Savings" id="chk_savings">
-                                            <label class="form-check-label" for="chk_savings">All Savings</label>
-                                        </div>
+                                    </optgroup>
+                                    <optgroup label="储蓄 (Savings)">
                                         {% for cat in savings_categories %}
-                                        <div class="form-check ms-3">
-                                            <input class="form-check-input category-item" type="checkbox"
-                                                name="category" value="{{ cat.name }}" id="chk_sav_{{ loop.index }}"
-                                                data-group="Savings">
-                                            <label class="form-check-label" for="chk_sav_{{ loop.index }}">{{ cat.name
-                                                }}</label>
-                                        </div>
+                                        <option value="{{ cat.name }}" {% if filter_category==cat.name %}selected{%
+                                            endif %}>{{ cat.name }}</option>
                                         {% endfor %}
-                                    </div>
-                                </div>
+                                    </optgroup>
+                                </select>
                             </div>
-
-
                             <div class="col-md-2">
                                 <button type="submit" class="btn btn-sm w-100"
                                     style="background-color: #52b788; color: white; border: none; font-weight: 600;">Apply</button>
@@ -302,29 +195,6 @@
 
 <script>
     // Toggle function removed - now using Bootstrap modal for Add Transaction
-
-    // Auto-check filters based on URL
-    document.addEventListener('DOMContentLoaded', function () {
-        const urlParams = new URLSearchParams(window.location.search);
-        const categories = urlParams.getAll('category');
-        const dropdownBtn = document.getElementById('categoryDropdown');
-
-        if (categories.length > 0) {
-            categories.forEach(cat => {
-                const checkbox = document.querySelector(`input[name="category"][value="${cat}"]`);
-                if (checkbox) checkbox.checked = true;
-            });
-            dropdownBtn.textContent = `${categories.length} Selected`;
-            dropdownBtn.classList.add('fw-bold', 'text-primary');
-        }
-
-        // Prevent dropdown from closing when clicking inside
-        document.querySelectorAll('.dropdown-menu').forEach(function (element) {
-            element.addEventListener('click', function (e) {
-                e.stopPropagation();
-            });
-        });
-    });
 </script>
 
 <div class="row">
@@ -360,7 +230,7 @@
         </div>
         {% endif %}
 
-        <div class="card" style="overflow: visible;">
+        <div class="card">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Recent Transactions</h5>
                 <button id="deleteSelectedBtn" class="btn btn-danger btn-sm" style="display: none;"
@@ -387,19 +257,16 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for date, items in transactions_by_date.items() %}
-                        {% set daily_total = items | sum(attribute='amount') %}
+                        {% set current_date = namespace(value=None) %}
+                        {% for transaction in transactions %}
+                        {% if current_date.value != transaction.date %}
+                        {% set current_date.value = transaction.date %}
                         <tr class="table-secondary">
-                            <td colspan="5" class="fw-bold py-2">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span><i class="bi bi-calendar3"></i> {{ date.strftime('%a, %d-%m-%Y') }}</span>
-                                    <span class="{{ 'text-success' if daily_total > 0 else 'text-danger' }}">
-                                        {{ '+' if daily_total > 0 else '' }}RM {{ daily_total|comma }}
-                                    </span>
-                                </div>
+                            <td colspan="6" class="fw-bold py-2">
+                                <i class="bi bi-calendar3"></i> {{ transaction.date.strftime('%a, %d-%m-%Y') }}
                             </td>
                         </tr>
-                        {% for transaction in items %}
+                        {% endif %}
                         <tr data-transaction-id="{{ transaction.id }}"
                             data-date="{{ transaction.date.strftime('%Y-%m-%d') }}"
                             data-category="{{ transaction.category }}" data-amount="{{ transaction.amount }}">
@@ -426,7 +293,6 @@
                                     onclick="deleteTransaction({{ transaction.id }})">Delete</button>
                             </td>
                         </tr>
-                        {% endfor %}
                         {% endfor %}
                     </tbody>
                 </table>
@@ -930,7 +796,7 @@
                 </ul>
                 <div class="tab-content" id="categoryTabContent">
                     <!-- Income Tab -->
-                    <div class="tab-pane fade show active" id="income">
+                    <div class="tab-pane fade show active" id="income-categories">
                         <div class="mb-3">
                             <label class="form-label fw-bold">Add New Income Category</label>
                             <div class="input-group">
@@ -947,7 +813,7 @@
                     </div>
 
                     <!-- Expense Tab -->
-                    <div class="tab-pane fade" id="expense">
+                    <div class="tab-pane fade" id="expense-categories">
                         <div class="mb-3">
                             <label class="form-label fw-bold">Add New Expense Category</label>
                             <div class="input-group">
@@ -986,65 +852,8 @@
 </div>
 
 <script>
-    // Category Filter Checkbox Logic
-    document.addEventListener('DOMContentLoaded', function () {
-        const allCheck = document.getElementById('chk_all');
-        const categoryCheckboxes = document.querySelectorAll('input[name="category"]:not(#chk_all)');
-        const dropdownBtn = document.getElementById('categoryDropdown');
-
-        function updateDropdownText() {
-            const checked = document.querySelectorAll('input[name="category"]:checked');
-            if (allCheck && allCheck.checked) {
-                dropdownBtn.textContent = 'All Categories';
-            } else if (checked.length === 0) {
-                // If nothing checked, default to All
-                if (allCheck) allCheck.checked = true;
-                dropdownBtn.textContent = 'All Categories';
-            } else if (checked.length === 1) {
-                const label = document.querySelector(`label[for="${checked[0].id}"]`);
-                dropdownBtn.textContent = label ? label.textContent.trim() : checked[0].value;
-            } else {
-                dropdownBtn.textContent = checked.length + ' categories selected';
-            }
-        }
-
-        if (allCheck) {
-            allCheck.addEventListener('change', function () {
-                if (this.checked) {
-                    categoryCheckboxes.forEach(cb => cb.checked = false);
-                }
-                updateDropdownText();
-            });
-        }
-
-        categoryCheckboxes.forEach(cb => {
-            cb.addEventListener('change', function () {
-                if (this.checked && allCheck) {
-                    allCheck.checked = false;
-                }
-                updateDropdownText();
-            });
-        });
-
-        updateDropdownText();
-
-        // Position dropdown when it opens
-        const dropdown = document.getElementById('categoryDropdown');
-        const dropdownMenu = dropdown.nextElementSibling;
-
-        dropdown.addEventListener('shown.bs.dropdown', function () {
-            const rect = dropdown.getBoundingClientRect();
-            dropdownMenu.style.left = rect.left + 'px';
-            dropdownMenu.style.top = (rect.bottom + 2) + 'px';
-        });
-    });
-</script>
-
-
-<script>
     // Category Management Functions
     let currentCategories = { income: [], expense: [] };
-
 
     // Load categories when modal opens
     document.getElementById('manageCategoriesModal').addEventListener('show.bs.modal', loadCategories);
